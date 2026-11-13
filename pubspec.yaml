@@ -1,0 +1,60 @@
+name: cup_memo
+description: "Cup Memo — a local-first memo app. This stage ships the compilable framework only."
+publish_to: 'none'
+
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^3.5.0
+
+  # Database (sqlite3 + bundled native libs, FTS5 enabled)
+  # sqlite3 2.x + sqlite3_flutter_libs 0.5.x: the native library (FTS5
+  # enabled) is shipped inside the plugin's AAR, so no NDK / native-assets
+  # build step is required. (sqlite3 3.x relies on Dart native assets, which
+  # are not supported for the Android build here.)
+  sqlite3: ^2.9.4
+  sqlite3_flutter_libs: ^0.5.39
+  path: ^1.9.0
+  path_provider: ^2.1.5
+
+  # Networking
+  dio: ^5.11.1
+
+  # Secure key storage + local preferences
+  flutter_secure_storage: ^10.3.4
+  shared_preferences: ^2.5.6
+
+  # Rendering / input
+  flutter_markdown: ^0.7.7
+  flutter_colorpicker: ^1.1.0
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+# The iOS/macOS implementations of path_provider and shared_preferences only
+# matter for the Android build as far as pub resolution goes; the newest ones
+# depend on `objective_c`, which ships a native-assets hook. Dart native assets
+# are not available for the Android target in this toolchain, so the last
+# hook-free versions are pinned here.
+dependency_overrides:
+  path_provider_foundation: 2.5.1
+  shared_preferences_foundation: 2.5.7
+  # The newest Android implementations of these two plugins build a C library
+  # through CMake/NDK (package:jni). The arm64 build host used here has no
+  # runnable x86_64 cmake, so the last pure-Java/FFI-free versions are pinned.
+  path_provider_android: 2.2.18
+  shared_preferences_android: 2.4.15
+
+flutter:
+  uses-material-design: true
