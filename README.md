@@ -204,6 +204,15 @@ APK 关键配置：
 CI：`.github/workflows/build-apk.yml` 会在 push / PR 时执行
 `pub get → analyze → test → build apk --release` 并上传 APK artifact。
 
+CI 环境被显式钉住，避免滚动更新把构建打红：
+
+- `runs-on: ubuntu-22.04`（而不是 `ubuntu-latest`）、`setup-java@v4` + `zulu` + JDK 17；
+- `subosito/flutter-action@v2` 固定 `flutter-version: '3.47.8'`。Flutter 3.50 把 Material
+  迁到了 `package:material_ui/material_ui.dart` 并把 `package:flutter/material.dart` 标记为
+  废弃，会额外产生 16 条 info；
+- analyze 只用 `flutter analyze --no-fatal-infos --no-fatal-warnings` 门禁 **error**，info /
+  warning 不阻断流水线。
+
 > **关于 minSdk 23**：Flutter 3.47 的 `flutter.minSdkVersion` 已经是 **24**，并且
 > `MinSdkVersionMigration` 会把 `build.gradle.kts` 里字面量 `minSdk = 23` 改回
 > `flutter.minSdkVersion`。为了真正产出 API 23 的包，本项目用命名常量
