@@ -17,10 +17,10 @@ import 'schema.dart';
 /// statement lives in plain SQL (see [Schema] and `ProviderDao`).
 class AppDatabase {
   AppDatabase._(this._db, this.storageDirectory)
-      : providerDao = ProviderDao(_db),
-        entryDao = EntryDao(_db),
-        taskDao = TaskDao(_db),
-        sessionDao = SessionDao(_db);
+    : providerDao = ProviderDao(_db),
+      entryDao = EntryDao(_db),
+      taskDao = TaskDao(_db),
+      sessionDao = SessionDao(_db);
 
   final Database _db;
 
@@ -92,19 +92,29 @@ class AppDatabase {
   /// version) and keep this comment in sync with [Schema.version].
   static void onUpgrade(Database db, int oldVersion, int newVersion) {
     if (oldVersion < 2) {
-      db.execute('ALTER TABLE entries ADD COLUMN is_ai_context INTEGER DEFAULT 0');
+      db.execute(
+        'ALTER TABLE entries ADD COLUMN is_ai_context INTEGER DEFAULT 0',
+      );
     }
     if (oldVersion < 3) {
-      db.execute("ALTER TABLE providers ADD COLUMN model_parameters TEXT DEFAULT '{}'");
+      db.execute(
+        "ALTER TABLE providers ADD COLUMN model_parameters TEXT DEFAULT '{}'",
+      );
     }
     if (oldVersion < 4) {
-      db.execute("ALTER TABLE chat_sessions ADD COLUMN bound_context_ids TEXT DEFAULT '[]'");
+      db.execute(
+        "ALTER TABLE chat_sessions ADD COLUMN bound_context_ids TEXT DEFAULT '[]'",
+      );
     }
     if (oldVersion < 5) {
-      db.execute('ALTER TABLE chat_sessions ADD COLUMN message_count INTEGER DEFAULT 0');
+      db.execute(
+        'ALTER TABLE chat_sessions ADD COLUMN message_count INTEGER DEFAULT 0',
+      );
     }
     if (oldVersion < 6) {
-      db.execute("ALTER TABLE providers ADD COLUMN available_models TEXT DEFAULT '[]'");
+      db.execute(
+        "ALTER TABLE providers ADD COLUMN available_models TEXT DEFAULT '[]'",
+      );
     }
   }
 

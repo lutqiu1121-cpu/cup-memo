@@ -64,10 +64,9 @@ class ProviderDao {
   void setDefault(String? id) {
     _db.execute('UPDATE providers SET is_default = 0');
     if (id != null) {
-      _db.execute(
-        'UPDATE providers SET is_default = 1 WHERE id = ?',
-        <Object?>[id],
-      );
+      _db.execute('UPDATE providers SET is_default = 1 WHERE id = ?', <Object?>[
+        id,
+      ]);
     }
   }
 

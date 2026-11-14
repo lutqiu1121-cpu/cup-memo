@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
 import '../../app.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -15,6 +17,7 @@ import '../../services/provider/provider_config.dart';
 import '../../services/provider/model_capabilities.dart';
 import '../../services/provider/provider_router.dart';
 import '../../services/github_service.dart';
+
 import 'package:dartantic_ai/dartantic_ai.dart' as da;
 import 'package:flutter/services.dart';
 
@@ -36,11 +39,12 @@ class ChatPageState extends ConsumerState<ChatPage> {
   String? _sessionId;
   bool _sending = false;
   bool _webSearch = false;
-  bool _toolsEnabled = true;
+  final bool _toolsEnabled = true;
   bool _thinkingEnabled = false;
   String? _selectedModel;
 
-  String _modelFor(ProviderConfig? provider) => _selectedModel ?? provider?.defaultModel ?? '';
+  String _modelFor(ProviderConfig? provider) =>
+      _selectedModel ?? provider?.defaultModel ?? '';
 
   @override
   void initState() {
@@ -52,7 +56,9 @@ class ChatPageState extends ConsumerState<ChatPage> {
     if (_sessionId != null) return;
     final db = ref.read(databaseProvider);
     final empty = db?.sessionDao.findEmpty();
-    setState(() => _sessionId = empty?.id ?? db?.sessionDao.create() ?? newSessionId());
+    setState(
+      () => _sessionId = empty?.id ?? db?.sessionDao.create() ?? newSessionId(),
+    );
   }
 
   Future<void> startNewSession() => _newSession();
@@ -65,43 +71,6 @@ class ChatPageState extends ConsumerState<ChatPage> {
       _messages.clear();
       _reasoning.clear();
     });
-  }
-
-  Future<void> _showHistory() async {
-    final db = ref.read(databaseProvider);
-    if (db == null) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('数据库不可用，无法读取历史会话')));
-      return;
-    }
-    var records = db.sessionDao.list();
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (BuildContext sheetContext) => StatefulBuilder(
-        builder: (BuildContext context, StateSetter setSheetState) => SafeArea(
-          child: SizedBox(
-            height: MediaQuery.sizeOf(context).height * .65,
-            child: records.isEmpty
-                ? const Center(child: Text('暂无历史会话'))
-                : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-                    itemCount: records.length,
-                    separatorBuilder: (_, _) => const Divider(height: 1),
-                    itemBuilder: (BuildContext context, int index) {
-                      final record = records[index];
-                      return ListTile(
-                        leading: const Icon(Icons.chat_bubble_outline),
-                        title: Text('会话 ${record.id.substring(0, 8)}'),
-                        subtitle: Text(_formatSessionDate(record.startedAt)),
-                        trailing: IconButton(icon: const Icon(Icons.delete_outline), onPressed: () { db.sessionDao.delete(record.id); records = db.sessionDao.list(); setSheetState(() {}); }),
-                        onTap: () { setState(() { _sessionId = record.id; _messages.clear(); _reasoning.clear(); }); Navigator.of(sheetContext).pop(); },
-                      );
-                    },
-                  ),
-          ),
-        ),
-      ),
-    );
   }
 
   @override
@@ -129,9 +98,13 @@ class ChatPageState extends ConsumerState<ChatPage> {
       final List<Entry> hits = await service.search(query);
       final List<String> searchBlocks = <String>[];
       for (final Entry hit in hits.take(5)) {
-        searchBlocks.add('[本地搜索 ${hit.title}]：${(await service.readBody(hit)).trim()}');
+        searchBlocks.add(
+          '[本地搜索 ${hit.title}]：${(await service.readBody(hit)).trim()}',
+        );
       }
-      prompts.add('【联网搜索开关已开启】当前无外部搜索 API，优先使用以下本地搜索上下文：\n${searchBlocks.join('\n')}');
+      prompts.add(
+        '【联网搜索开关已开启】当前无外部搜索 API，优先使用以下本地搜索上下文：\n${searchBlocks.join('\n')}',
+      );
     }
     return prompts;
   }
@@ -139,48 +112,164 @@ class ChatPageState extends ConsumerState<ChatPage> {
   List<da.Tool> _tools() {
     return <da.Tool>[
       da.Tool<Map<String, dynamic>>(
-        name: 'search_entries', description: 'Search local Cup Memo entries.',
-        inputSchema: da.Schema.fromMap({'type': 'object', 'properties': {'query': {'type': 'string'}}, 'required': ['query']}),
+        name: 'search_entries',
+        description: 'Search local Cup Memo entries.',
+        inputSchema: da.Schema.fromMap({
+          'type': 'object',
+          'properties': {
+            'query': {'type': 'string'},
+          },
+          'required': ['query'],
+        }),
         onCall: (Map<String, dynamic> args) async {
           final EntryService? service = ref.read(entryServiceProvider);
           if (service == null) return 'Database unavailable';
-          final List<Entry> entries = await service.search(args['query']?.toString() ?? '');
-          return entries.take(10).map((Entry e) => {'id': e.id, 'title': e.title, 'category': e.category}).toList();
+          final List<Entry> entries = await service.search(
+            args['query']?.toString() ?? '',
+          );
+          return entries
+              .take(10)
+              .map(
+                (Entry e) => {
+                  'id': e.id,
+                  'title': e.title,
+                  'category': e.category,
+                },
+              )
+              .toList();
         },
       ),
       da.Tool<Map<String, dynamic>>(
-        name: 'create_entry', description: 'Create a local memo entry when explicitly requested.',
-        inputSchema: da.Schema.fromMap({'type': 'object', 'properties': {'title': {'type': 'string'}, 'body': {'type': 'string'}, 'category': {'type': 'string'}}, 'required': ['title', 'body']}),
+        name: 'create_entry',
+        description: 'Create a local memo entry when explicitly requested.',
+        inputSchema: da.Schema.fromMap({
+          'type': 'object',
+          'properties': {
+            'title': {'type': 'string'},
+            'body': {'type': 'string'},
+            'category': {'type': 'string'},
+          },
+          'required': ['title', 'body'],
+        }),
         onCall: (Map<String, dynamic> args) async {
           final EntryService? service = ref.read(entryServiceProvider);
           if (service == null) return 'Database unavailable';
-          final result = await service.create(title: args['title']?.toString() ?? 'Untitled', body: args['body']?.toString() ?? '', category: args['category']?.toString() ?? 'AI', tags: const ['AI'], isAiContext: false);
+          final result = await service.create(
+            title: args['title']?.toString() ?? 'Untitled',
+            body: args['body']?.toString() ?? '',
+            category: args['category']?.toString() ?? 'AI',
+            tags: const ['AI'],
+            isAiContext: false,
+          );
           return 'Entry ${result.entryId} created (${result.outcome.name})';
         },
       ),
       da.Tool<Map<String, dynamic>>(
-        name: 'add_task', description: 'Add a current task.',
-        inputSchema: da.Schema.fromMap({'type': 'object', 'properties': {'title': {'type': 'string'}, 'detail': {'type': 'string'}}, 'required': ['title']}),
-        onCall: (Map<String, dynamic> args) => ref.read(databaseProvider)?.taskDao.addCurrentTask(title: args['title']?.toString() ?? 'Untitled', detail: args['detail']?.toString() ?? '') ?? 'Database unavailable',
+        name: 'add_task',
+        description: 'Add a current task.',
+        inputSchema: da.Schema.fromMap({
+          'type': 'object',
+          'properties': {
+            'title': {'type': 'string'},
+            'detail': {'type': 'string'},
+          },
+          'required': ['title'],
+        }),
+        onCall: (Map<String, dynamic> args) =>
+            ref
+                .read(databaseProvider)
+                ?.taskDao
+                .addCurrentTask(
+                  title: args['title']?.toString() ?? 'Untitled',
+                  detail: args['detail']?.toString() ?? '',
+                ) ??
+            'Database unavailable',
       ),
       da.Tool<Map<String, dynamic>>(
-        name: 'complete_task', description: 'Complete a task by id.',
-        inputSchema: da.Schema.fromMap({'type': 'object', 'properties': {'task_id': {'type': 'string'}}, 'required': ['task_id']}),
-        onCall: (Map<String, dynamic> args) => ref.read(databaseProvider)?.taskDao.completeTask(args['task_id']?.toString() ?? '') ?? false,
+        name: 'complete_task',
+        description: 'Complete a task by id.',
+        inputSchema: da.Schema.fromMap({
+          'type': 'object',
+          'properties': {
+            'task_id': {'type': 'string'},
+          },
+          'required': ['task_id'],
+        }),
+        onCall: (Map<String, dynamic> args) =>
+            ref
+                .read(databaseProvider)
+                ?.taskDao
+                .completeTask(args['task_id']?.toString() ?? '') ??
+            false,
       ),
       da.Tool<Map<String, dynamic>>(
-        name: 'fetch_github_file', description: 'Read a file from GitHub using the configured secure token.',
-        inputSchema: da.Schema.fromMap({'type': 'object', 'properties': {'owner': {'type': 'string'}, 'repo': {'type': 'string'}, 'path': {'type': 'string'}, 'ref': {'type': 'string'}}, 'required': ['owner', 'repo', 'path']}),
-        onCall: (Map<String, dynamic> args) => GitHubService().fetchFile(owner: args['owner'].toString(), repo: args['repo'].toString(), path: args['path'].toString(), ref: args['ref']?.toString() ?? 'main'),
+        name: 'fetch_github_file',
+        description:
+            'Read a file from GitHub using the configured secure token.',
+        inputSchema: da.Schema.fromMap({
+          'type': 'object',
+          'properties': {
+            'owner': {'type': 'string'},
+            'repo': {'type': 'string'},
+            'path': {'type': 'string'},
+            'ref': {'type': 'string'},
+          },
+          'required': ['owner', 'repo', 'path'],
+        }),
+        onCall: (Map<String, dynamic> args) => GitHubService().fetchFile(
+          owner: args['owner'].toString(),
+          repo: args['repo'].toString(),
+          path: args['path'].toString(),
+          ref: args['ref']?.toString() ?? 'main',
+        ),
       ),
       da.Tool<Map<String, dynamic>>(
-        name: 'commit_github_file', description: 'Commit a file to GitHub using the configured secure token.',
-        inputSchema: da.Schema.fromMap({'type': 'object', 'properties': {'owner': {'type': 'string'}, 'repo': {'type': 'string'}, 'path': {'type': 'string'}, 'content': {'type': 'string'}, 'message': {'type': 'string'}, 'branch': {'type': 'string'}}, 'required': ['owner', 'repo', 'path', 'content', 'message']}),
-        onCall: (Map<String, dynamic> args) async { await GitHubService().commitFile(owner: args['owner'].toString(), repo: args['repo'].toString(), path: args['path'].toString(), content: args['content'].toString(), message: args['message'].toString(), branch: args['branch']?.toString() ?? 'main'); return 'GitHub commit completed'; },
+        name: 'commit_github_file',
+        description:
+            'Commit a file to GitHub using the configured secure token.',
+        inputSchema: da.Schema.fromMap({
+          'type': 'object',
+          'properties': {
+            'owner': {'type': 'string'},
+            'repo': {'type': 'string'},
+            'path': {'type': 'string'},
+            'content': {'type': 'string'},
+            'message': {'type': 'string'},
+            'branch': {'type': 'string'},
+          },
+          'required': ['owner', 'repo', 'path', 'content', 'message'],
+        }),
+        onCall: (Map<String, dynamic> args) async {
+          await GitHubService().commitFile(
+            owner: args['owner'].toString(),
+            repo: args['repo'].toString(),
+            path: args['path'].toString(),
+            content: args['content'].toString(),
+            message: args['message'].toString(),
+            branch: args['branch']?.toString() ?? 'main',
+          );
+          return 'GitHub commit completed';
+        },
       ),
       da.Tool<Map<String, dynamic>>(
-        name: 'list_tasks', description: 'List current and recently completed tasks.',
-        onCall: (_) { final dao = ref.read(databaseProvider)?.taskDao; return dao == null ? 'Database unavailable' : {'current': dao.listCurrent().map((t) => {'id': t.id, 'title': t.title}).toList(), 'history': dao.listHistory().take(10).map((t) => {'id': t.id, 'title': t.title}).toList()}; },
+        name: 'list_tasks',
+        description: 'List current and recently completed tasks.',
+        onCall: (_) {
+          final dao = ref.read(databaseProvider)?.taskDao;
+          return dao == null
+              ? 'Database unavailable'
+              : {
+                  'current': dao
+                      .listCurrent()
+                      .map((t) => {'id': t.id, 'title': t.title})
+                      .toList(),
+                  'history': dao
+                      .listHistory()
+                      .take(10)
+                      .map((t) => {'id': t.id, 'title': t.title})
+                      .toList(),
+                };
+        },
       ),
     ];
   }
@@ -188,7 +277,9 @@ class ChatPageState extends ConsumerState<ChatPage> {
   Future<void> _send() async {
     final String text = _input.text.trim();
     if (text.isEmpty || _sending) return;
-    final ProviderRouter? router = await ref.read(providerRouterProvider.future);
+    final ProviderRouter? router = await ref.read(
+      providerRouterProvider.future,
+    );
     if (router == null) {
       if (!mounted) return;
       showPendingSnackBar(context, '请先配置 Provider 和 API Key');
@@ -209,7 +300,10 @@ class ChatPageState extends ConsumerState<ChatPage> {
     final String assistantId = newMessageId();
     setState(() {
       _messages.add(user);
-      ref.read(databaseProvider)?.sessionDao.incrementMessageCount(_sessionId ?? 'current');
+      ref
+          .read(databaseProvider)
+          ?.sessionDao
+          .incrementMessageCount(_sessionId ?? 'current');
       _messages.add(
         ChatMessage(
           id: assistantId,
@@ -230,7 +324,9 @@ class ChatPageState extends ConsumerState<ChatPage> {
     void flush() {
       flushTimer?.cancel();
       flushTimer = null;
-      final int index = _messages.indexWhere((ChatMessage m) => m.id == assistantId);
+      final int index = _messages.indexWhere(
+        (ChatMessage m) => m.id == assistantId,
+      );
       if (!mounted || index < 0) return;
       final ChatMessage old = _messages[index];
       setState(() {
@@ -253,8 +349,14 @@ class ChatPageState extends ConsumerState<ChatPage> {
 
     try {
       final List<String> memory = await _memoryPrompts(text);
-      final List<ChatMessage> contextRequest = _trimMessages(request, memory, _modelFor(router.config));
-      debugPrint('CupMemo Agent payload: model=${_modelFor(router.config)} messages=${contextRequest.length} systemPrompts=${memory.length} tools=${_toolsEnabled ? _tools().length : 0}');
+      final List<ChatMessage> contextRequest = _trimMessages(
+        request,
+        memory,
+        _modelFor(router.config),
+      );
+      debugPrint(
+        'CupMemo Agent payload: model=${_modelFor(router.config)} messages=${contextRequest.length} systemPrompts=${memory.length} tools=${_toolsEnabled ? _tools().length : 0}',
+      );
       await for (final AgentStreamChunk chunk in router.streamMessage(
         contextRequest,
         tools: _toolsEnabled ? _tools() : null,
@@ -262,7 +364,8 @@ class ChatPageState extends ConsumerState<ChatPage> {
       )) {
         buffer.write(chunk.text);
         if (chunk.reasoning.isNotEmpty) {
-          _reasoning[assistantId] = '${_reasoning[assistantId] ?? ''}${chunk.reasoning}';
+          _reasoning[assistantId] =
+              '${_reasoning[assistantId] ?? ''}${chunk.reasoning}';
         }
         scheduleFlush();
       }
@@ -270,7 +373,9 @@ class ChatPageState extends ConsumerState<ChatPage> {
       flush();
     } catch (error) {
       flushTimer?.cancel();
-      final int index = _messages.indexWhere((ChatMessage m) => m.id == assistantId);
+      final int index = _messages.indexWhere(
+        (ChatMessage m) => m.id == assistantId,
+      );
       if (mounted && index >= 0) {
         final old = _messages[index];
         setState(() {
@@ -290,9 +395,17 @@ class ChatPageState extends ConsumerState<ChatPage> {
     }
   }
 
-  List<ChatMessage> _trimMessages(List<ChatMessage> messages, List<String> memory, String model) {
-    final int limit = ModelCapabilitiesRegistry.forModel(model).maxContextTokens;
-    final int budgetChars = (limit * 4 - memory.join('\n').length).clamp(2000, limit * 4);
+  List<ChatMessage> _trimMessages(
+    List<ChatMessage> messages,
+    List<String> memory,
+    String model,
+  ) {
+    final int limit = ModelCapabilitiesRegistry.forModel(model)
+        .maxContextTokens;
+    final int budgetChars = (limit * 4 - memory.join('\n').length).clamp(
+      2000,
+      limit * 4,
+    );
     var used = 0;
     final List<ChatMessage> result = <ChatMessage>[];
     for (final ChatMessage message in messages.reversed) {
@@ -302,26 +415,6 @@ class ChatPageState extends ConsumerState<ChatPage> {
       used += cost;
     }
     return result.reversed.toList(growable: false);
-  }
-
-  int _estimatedContextTokens() {
-    return _messages.fold<int>(0, (int total, ChatMessage message) => total + (message.content.length / 4).ceil());
-  }
-
-  Widget _statsBar(ProviderConfig? active) {
-    final int limit = ModelCapabilitiesRegistry.forModel(_modelFor(active), manualOverride: active?.modelParameters).maxContextTokens;
-    final int used = _estimatedContextTokens();
-    final int remaining = ((1 - used / limit) * 100).round().clamp(0, 100);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-      child: Row(children: <Widget>[
-        Text('本轮 Token ${_input.text.length ~/ 4} · 上下文已用 $used · 剩余 $remaining%', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-        const Spacer(),
-        Icon(_webSearch ? Icons.public : Icons.public_off, size: 15, color: _webSearch ? Theme.of(context).colorScheme.primary : AppColors.textSecondary),
-        const SizedBox(width: 4),
-        Text(_webSearch ? '联网开' : '联网关', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-      ]),
-    );
   }
 
   void _scrollToBottom() {
@@ -357,7 +450,9 @@ class ChatPageState extends ConsumerState<ChatPage> {
                 leading: const Icon(Icons.hub_outlined),
                 title: Text(item.name),
                 subtitle: Text(item.kind.label),
-                trailing: item.isDefault ? const Icon(Icons.star, size: 18) : null,
+                trailing: item.isDefault
+                    ? const Icon(Icons.star, size: 18)
+                    : null,
                 onTap: () => Navigator.of(sheetContext).pop(item.id),
               ),
             const SizedBox(height: 8),
@@ -367,25 +462,33 @@ class ChatPageState extends ConsumerState<ChatPage> {
     );
     if (selected == null || !mounted) return;
     ref.read(currentProviderIdProvider.notifier).select(selected);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Provider 已切换，仅影响后续消息')),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Provider 已切换，仅影响后续消息')));
   }
-
-  static String _formatSessionDate(DateTime value) => '${value.year}/${value.month.toString().padLeft(2, '0')}/${value.day.toString().padLeft(2, '0')} ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
 
   @override
   Widget build(BuildContext context) {
     final ProviderConfig? active = ref.watch(activeProviderProvider);
     final String activeModel = _modelFor(active);
-    final ModelCapabilities caps = ModelCapabilitiesRegistry.forModel(activeModel, manualOverride: active?.modelParameters);
+    final ModelCapabilities caps = ModelCapabilitiesRegistry.forModel(
+      activeModel,
+      manualOverride: active?.modelParameters,
+    );
     if (!caps.supportsThinking && _thinkingEnabled) _thinkingEnabled = false;
     return Scaffold(
       appBar: AppBar(
         title: const Text('会话'),
-        leading: IconButton(tooltip: '菜单', icon: const Icon(Icons.menu), onPressed: () => appShellScaffoldKey.currentState?.openDrawer()),
+        leading: IconButton(
+          tooltip: '菜单',
+          icon: const Icon(Icons.menu),
+          onPressed: () => appShellScaffoldKey.currentState?.openDrawer(),
+        ),
         actions: <Widget>[
-          IconButton(tooltip: '新建对话', icon: const Icon(Icons.add_comment_outlined), onPressed: _newSession),
+          IconButton(
+            tooltip: '新建对话',
+            icon: const Icon(Icons.add_comment_outlined),
+            onPressed: _newSession,
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: ActionChip(
@@ -419,17 +522,77 @@ class ChatPageState extends ConsumerState<ChatPage> {
                     ),
                   ),
           ),
-          Padding(padding: const EdgeInsets.fromLTRB(16, 4, 16, 0), child: Column(children: <Widget>[
-            if (active != null && active.availableModels.isNotEmpty)
-              DropdownButton<String>(value: active.availableModels.contains(activeModel) ? activeModel : null, isExpanded: true, underline: const SizedBox.shrink(), items: active.availableModels.map((String model) => DropdownMenuItem<String>(value: model, child: Text(model))).toList(), onChanged: (String? value) { if (value != null) setState(() { _selectedModel = value; _thinkingEnabled = ModelCapabilitiesRegistry.forModel(value, manualOverride: active.modelParameters).supportsThinking; }); })
-            else
-              Align(alignment: Alignment.centerLeft, child: Text('模型：$activeModel', style: Theme.of(context).textTheme.labelMedium)),
-            Row(children: <Widget>[
-              FilterChip(avatar: Icon(_thinkingEnabled ? Icons.psychology : Icons.psychology_outlined, size: 16), label: const Text('深度思考'), selected: _thinkingEnabled, onSelected: caps.supportsThinking ? (bool value) => setState(() => _thinkingEnabled = value) : null),
-              const SizedBox(width: 8),
-              FilterChip(avatar: Icon(_webSearch ? Icons.public : Icons.public_off, size: 16), label: const Text('联网搜索'), selected: _webSearch, onSelected: (bool value) => setState(() => _webSearch = value)),
-            ]),
-          ])),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: Column(
+              children: <Widget>[
+                if (active != null && active.availableModels.isNotEmpty)
+                  DropdownButton<String>(
+                    value: active.availableModels.contains(activeModel)
+                        ? activeModel
+                        : null,
+                    isExpanded: true,
+                    underline: const SizedBox.shrink(),
+                    items: active.availableModels
+                        .map(
+                          (String model) => DropdownMenuItem<String>(
+                            value: model,
+                            child: Text(model),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (String? value) {
+                      if (value != null) {
+                        setState(() {
+                          _selectedModel = value;
+                          _thinkingEnabled = ModelCapabilitiesRegistry.forModel(
+                            value,
+                            manualOverride: active.modelParameters,
+                          ).supportsThinking;
+                        });
+                      }
+                    },
+                  )
+                else
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '模型：$activeModel',
+                      style: Theme.of(context).textTheme.labelMedium,
+                    ),
+                  ),
+                Row(
+                  children: <Widget>[
+                    FilterChip(
+                      avatar: Icon(
+                        _thinkingEnabled
+                            ? Icons.psychology
+                            : Icons.psychology_outlined,
+                        size: 16,
+                      ),
+                      label: const Text('深度思考'),
+                      selected: _thinkingEnabled,
+                      onSelected: caps.supportsThinking
+                          ? (bool value) =>
+                                setState(() => _thinkingEnabled = value)
+                          : null,
+                    ),
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      avatar: Icon(
+                        _webSearch ? Icons.public : Icons.public_off,
+                        size: 16,
+                      ),
+                      label: const Text('联网搜索'),
+                      selected: _webSearch,
+                      onSelected: (bool value) =>
+                          setState(() => _webSearch = value),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
           SafeArea(
             top: false,
             child: Padding(
@@ -505,10 +668,29 @@ class _Bubble extends StatelessWidget {
                 childrenPadding: EdgeInsets.zero,
                 title: const Text('思考过程', style: TextStyle(fontSize: 12)),
                 children: <Widget>[
-                  Text(reasoning!, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  Text(
+                    reasoning!,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ],
               ),
-            Row(crossAxisAlignment: CrossAxisAlignment.end, children: <Widget>[Expanded(child: Text(message.content.isEmpty ? '…' : message.content)), IconButton(tooltip: '复制', icon: const Icon(Icons.copy_outlined, size: 16), onPressed: () => Clipboard.setData(ClipboardData(text: message.content))) ]),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: <Widget>[
+                Expanded(
+                  child: Text(message.content.isEmpty ? '…' : message.content),
+                ),
+                IconButton(
+                  tooltip: '复制',
+                  icon: const Icon(Icons.copy_outlined, size: 16),
+                  onPressed: () =>
+                      Clipboard.setData(ClipboardData(text: message.content)),
+                ),
+              ],
+            ),
           ],
         ),
       ),

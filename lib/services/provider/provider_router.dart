@@ -14,7 +14,12 @@ class AgentStreamChunk {
 }
 
 class ChatCompletion {
-  const ChatCompletion({required this.content, this.model = '', this.promptTokens = 0, this.completionTokens = 0});
+  const ChatCompletion({
+    required this.content,
+    this.model = '',
+    this.promptTokens = 0,
+    this.completionTokens = 0,
+  });
   final String content;
   final String model;
   final int promptTokens;
@@ -30,13 +35,27 @@ class WafGuardClient extends http.BaseClient {
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     final http.StreamedResponse response = await _inner.send(request);
-    final String contentType = (response.headers['content-type'] ?? '').toLowerCase();
-    final bool badStatus = response.statusCode < 200 || response.statusCode >= 300;
-    final bool allowed = contentType.contains('json') || contentType.contains('event-stream');
+    final String contentType = (response.headers['content-type'] ?? '')
+        .toLowerCase();
+    final bool badStatus =
+        response.statusCode < 200 || response.statusCode >= 300;
+    final bool allowed =
+        contentType.contains('json') || contentType.contains('event-stream');
     if (badStatus || contentType.contains('text/html') || !allowed) {
       await response.stream.drain<void>();
-      final String body = jsonEncode(<String, dynamic>{'error': <String, dynamic>{'message': '请求被防火墙拦截', 'type': 'waf_blocked'}});
-      return http.StreamedResponse(Stream<List<int>>.value(utf8.encode(body)), 502, headers: const <String, String>{'content-type': 'application/json'}, request: response.request, reasonPhrase: 'WAF Guard');
+      final String body = jsonEncode(<String, dynamic>{
+        'error': <String, dynamic>{
+          'message': '请求被防火墙拦截',
+          'type': 'waf_blocked',
+        },
+      });
+      return http.StreamedResponse(
+        Stream<List<int>>.value(utf8.encode(body)),
+        502,
+        headers: const <String, String>{'content-type': 'application/json'},
+        request: response.request,
+        reasonPhrase: 'WAF Guard',
+      );
     }
     return response;
   }
@@ -46,7 +65,15 @@ class WafGuardClient extends http.BaseClient {
 }
 
 class GuardedOpenAIProvider extends da.OpenAIProvider {
-  GuardedOpenAIProvider({required http.Client client, super.apiKey, super.baseUrl, super.apiKeyName, super.headers, super.name, super.displayName}) : _client = client;
+  GuardedOpenAIProvider({
+    required this._client,
+    super.apiKey,
+    super.baseUrl,
+    super.apiKeyName,
+    super.headers,
+    super.name,
+    super.displayName,
+  });
   final http.Client _client;
 
   @override
@@ -75,8 +102,18 @@ class GuardedOpenAIProvider extends da.OpenAIProvider {
 
 abstract class ProviderClient {
   ProviderConfig get config;
-  Future<ChatCompletion> sendMessage(List<memo.ChatMessage> messages, {String? model, List<da.Tool>? tools, List<String> systemPrompts = const <String>[]});
-  Stream<AgentStreamChunk> streamMessage(List<memo.ChatMessage> messages, {String? model, List<da.Tool>? tools, List<String> systemPrompts = const <String>[]});
+  Future<ChatCompletion> sendMessage(
+    List<memo.ChatMessage> messages, {
+    String? model,
+    List<da.Tool>? tools,
+    List<String> systemPrompts = const <String>[],
+  });
+  Stream<AgentStreamChunk> streamMessage(
+    List<memo.ChatMessage> messages, {
+    String? model,
+    List<da.Tool>? tools,
+    List<String> systemPrompts = const <String>[],
+  });
 }
 
 class AgentProviderClient implements ProviderClient {
@@ -98,37 +135,74 @@ class AgentProviderClient implements ProviderClient {
     return da.Agent.forProvider(provider, chatModelName: model, tools: tools);
   }
 
-  List<da.ChatMessage> _history(List<memo.ChatMessage> messages, List<String> prompts) {
-    final List<da.ChatMessage> result = <da.ChatMessage>[...prompts.map(da.ChatMessage.system)];
+  List<da.ChatMessage> _history(
+    List<memo.ChatMessage> messages,
+    List<String> prompts,
+  ) {
+    final List<da.ChatMessage> result = <da.ChatMessage>[
+      ...prompts.map(da.ChatMessage.system),
+    ];
     for (final memo.ChatMessage message in messages.take(messages.length - 1)) {
-      if (message.role == memo.ChatRole.user) result.add(da.ChatMessage.user(message.content));
-      if (message.role == memo.ChatRole.assistant) result.add(da.ChatMessage.model(message.content));
+      if (message.role == memo.ChatRole.user) {
+        result.add(da.ChatMessage.user(message.content));
+      }
+      if (message.role == memo.ChatRole.assistant) {
+        result.add(da.ChatMessage.model(message.content));
+      }
     }
     return result;
   }
 
-  String _prompt(List<memo.ChatMessage> messages) => messages.isEmpty ? '' : messages.last.content;
+  String _prompt(List<memo.ChatMessage> messages) =>
+      messages.isEmpty ? '' : messages.last.content;
 
   @override
-  Future<ChatCompletion> sendMessage(List<memo.ChatMessage> messages, {String? model, List<da.Tool>? tools, List<String> systemPrompts = const <String>[]}) async {
-    final da.ChatResult<String> result = await _agent(model: model, tools: tools).send(_prompt(messages), history: _history(messages, systemPrompts));
-    return ChatCompletion(content: result.output, model: model ?? config.defaultModel);
+  Future<ChatCompletion> sendMessage(
+    List<memo.ChatMessage> messages, {
+    String? model,
+    List<da.Tool>? tools,
+    List<String> systemPrompts = const <String>[],
+  }) async {
+    final da.ChatResult<String> result = await _agent(
+      model: model,
+      tools: tools,
+    ).send(_prompt(messages), history: _history(messages, systemPrompts));
+    return ChatCompletion(
+      content: result.output,
+      model: model ?? config.defaultModel,
+    );
   }
 
   @override
-  Stream<AgentStreamChunk> streamMessage(List<memo.ChatMessage> messages, {String? model, List<da.Tool>? tools, List<String> systemPrompts = const <String>[]}) async* {
+  Stream<AgentStreamChunk> streamMessage(
+    List<memo.ChatMessage> messages, {
+    String? model,
+    List<da.Tool>? tools,
+    List<String> systemPrompts = const <String>[],
+  }) async* {
     final da.Agent agent = _agent(model: model, tools: tools);
     int toolRounds = 0;
     try {
-      await for (final da.ChatResult<String> chunk in agent.sendStream(_prompt(messages), history: _history(messages, systemPrompts))) {
-        toolRounds += chunk.messages.expand((da.ChatMessage message) => message.parts.toolResults).length;
-        if (toolRounds > 8) throw StateError('Agent tool loop exceeded 8 rounds');
+      await for (final da.ChatResult<String> chunk in agent.sendStream(
+        _prompt(messages),
+        history: _history(messages, systemPrompts),
+      )) {
+        toolRounds += chunk.messages
+            .expand((da.ChatMessage message) => message.parts.toolResults)
+            .length;
+        if (toolRounds > 8) {
+          throw StateError('Agent tool loop exceeded 8 rounds');
+        }
         final String text = chunk.output;
         final String thinking = chunk.thinking ?? '';
-        if (text.contains('<!DOCTYPE html>') || text.contains('<script') || text.toLowerCase().contains('waf-ce.chaitin.cn')) {
+        if (text.contains('<!DOCTYPE html>') ||
+            text.contains('<script') ||
+            text.toLowerCase().contains('waf-ce.chaitin.cn')) {
           throw StateError('请求被防火墙拦截');
         }
-        if (text.isNotEmpty || thinking.isNotEmpty) yield AgentStreamChunk(text: text, reasoning: thinking);
+        if (text.isNotEmpty || thinking.isNotEmpty) {
+          yield AgentStreamChunk(text: text, reasoning: thinking);
+        }
       }
     } on openai.ApiException {
       throw StateError('网络请求失败，请稍后重试');
@@ -146,10 +220,33 @@ class ProviderRouter {
   final String? apiKey;
 
   ProviderClient createClient() {
-    if ((apiKey == null || apiKey!.isEmpty) && config.kind != ProviderKind.ollama) throw StateError('Provider ${config.name} 没有可用的 API Key');
+    if ((apiKey == null || apiKey!.isEmpty) &&
+        config.kind != ProviderKind.ollama) {
+      throw StateError('Provider ${config.name} 没有可用的 API Key');
+    }
     return AgentProviderClient(config: config, apiKey: apiKey);
   }
 
-  Future<ChatCompletion> sendMessage(List<memo.ChatMessage> messages, {String? model, List<da.Tool>? tools, List<String> systemPrompts = const <String>[]}) => createClient().sendMessage(messages, model: model ?? config.defaultModel, tools: tools, systemPrompts: systemPrompts);
-  Stream<AgentStreamChunk> streamMessage(List<memo.ChatMessage> messages, {String? model, List<da.Tool>? tools, List<String> systemPrompts = const <String>[]}) => createClient().streamMessage(messages, model: model ?? config.defaultModel, tools: tools, systemPrompts: systemPrompts);
+  Future<ChatCompletion> sendMessage(
+    List<memo.ChatMessage> messages, {
+    String? model,
+    List<da.Tool>? tools,
+    List<String> systemPrompts = const <String>[],
+  }) => createClient().sendMessage(
+    messages,
+    model: model ?? config.defaultModel,
+    tools: tools,
+    systemPrompts: systemPrompts,
+  );
+  Stream<AgentStreamChunk> streamMessage(
+    List<memo.ChatMessage> messages, {
+    String? model,
+    List<da.Tool>? tools,
+    List<String> systemPrompts = const <String>[],
+  }) => createClient().streamMessage(
+    messages,
+    model: model ?? config.defaultModel,
+    tools: tools,
+    systemPrompts: systemPrompts,
+  );
 }

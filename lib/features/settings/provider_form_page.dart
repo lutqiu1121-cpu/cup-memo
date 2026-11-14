@@ -61,21 +61,33 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
       _headers.text = ProviderConfig.headersToText(existing.extraHeaders);
       _kind = existing.kind;
       _isDefault = existing.isDefault;
-      _temperature = (existing.modelParameters['temperature'] as num?)?.toDouble() ?? 0.7;
-      _maxTokens = (existing.modelParameters['max_tokens'] as num?)?.toInt() ?? 4096;
+      _temperature =
+          (existing.modelParameters['temperature'] as num?)?.toDouble() ?? 0.7;
+      _maxTokens =
+          (existing.modelParameters['max_tokens'] as num?)?.toInt() ?? 4096;
       _thinking = existing.modelParameters['thinking_enabled'] == true;
-      _thinkingLevel = existing.modelParameters['thinking_level']?.toString() ?? 'medium';
-      _thinkingBudget = (existing.modelParameters['thinking_budget'] as num?)?.toDouble() ?? 4096;
+      _thinkingLevel =
+          existing.modelParameters['thinking_level']?.toString() ?? 'medium';
+      _thinkingBudget =
+          (existing.modelParameters['thinking_budget'] as num?)?.toDouble() ??
+          4096;
       _manualContext = existing.modelParameters['context_override'] is num;
-      _contextOverride = (existing.modelParameters['context_override'] as num?)?.toInt() ?? 8192;
+      _contextOverride =
+          (existing.modelParameters['context_override'] as num?)?.toInt() ??
+          8192;
       _manualThinking = existing.modelParameters['thinking_override'] is bool;
-      if (_manualThinking) _thinking = existing.modelParameters['thinking_override'] == true;
+      if (_manualThinking) {
+        _thinking = existing.modelParameters['thinking_override'] == true;
+      }
       _preset = ProviderPresets.all.firstWhere(
-        (ProviderPreset preset) => preset.kind == existing.kind &&
-            preset.baseUrl == existing.baseUrl,
+        (ProviderPreset preset) =>
+            preset.kind == existing.kind && preset.baseUrl == existing.baseUrl,
         orElse: () => ProviderPresets.custom,
       );
-      _capabilities = ModelCapabilitiesRegistry.resolveModelCaps(model: existing.defaultModel, manualOverride: existing.modelParameters);
+      _capabilities = ModelCapabilitiesRegistry.resolveModelCaps(
+        model: existing.defaultModel,
+        manualOverride: existing.modelParameters,
+      );
     }
   }
 
@@ -114,12 +126,14 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
   Future<void> _fetchModels() async {
     final String base = _baseUrl.text.trim().replaceFirst(RegExp(r'/+$'), '');
     if (base.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请先填写 baseUrl')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('请先填写 baseUrl')));
       return;
     }
     final String key = _apiKey.text.trim();
     if (key.isEmpty && _kind != ProviderKind.ollama) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请先填写 API Key')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('请先填写 API Key')));
       return;
     }
 
@@ -143,15 +157,24 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
         modelsUrl,
         options: Options(
           headers: headers.isEmpty ? null : headers,
-          validateStatus: (int? status) => status != null && status >= 200 && status < 300,
+          validateStatus: (int? status) =>
+              status != null && status >= 200 && status < 300,
         ),
       );
-      final dynamic raw = response.data is Map ? (response.data as Map)['data'] : response.data;
+      final dynamic raw = response.data is Map
+          ? (response.data as Map)['data']
+          : response.data;
       final List<String> models = raw is List
-          ? raw.map((Object? value) {
-              if (value is Map) return (value['id'] ?? value['name'])?.toString();
-              return value?.toString();
-            }).whereType<String>().where((String value) => value.isNotEmpty).toList()
+          ? raw
+                .map((Object? value) {
+                  if (value is Map) {
+                    return (value['id'] ?? value['name'])?.toString();
+                  }
+                  return value?.toString();
+                })
+                .whereType<String>()
+                .where((String value) => value.isNotEmpty)
+                .toList()
           : const <String>[];
       if (!mounted) return;
       setState(() {
@@ -159,20 +182,28 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
         _loadingModels = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(models.isEmpty ? '接口未返回可用模型' : '已获取 ${models.length} 个模型')),
+        SnackBar(
+          content: Text(
+            models.isEmpty ? '接口未返回可用模型' : '已获取 ${models.length} 个模型',
+          ),
+        ),
       );
     } on DioException catch (error) {
       if (!mounted) return;
       setState(() => _loadingModels = false);
       final int? status = error.response?.statusCode;
-      final String detail = error.response?.data?.toString() ?? error.message ?? error.type.name;
+      final String detail =
+          error.response?.data?.toString() ?? error.message ?? error.type.name;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('获取模型失败${status == null ? '' : ' [$status]'}：$detail')),
+        SnackBar(
+          content: Text('获取模型失败${status == null ? '' : ' [$status]'}：$detail'),
+        ),
       );
     } catch (error) {
       if (!mounted) return;
       setState(() => _loadingModels = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('获取模型失败：$error')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('获取模型失败：$error')));
     }
   }
 
@@ -228,7 +259,9 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
       isDefault: _isDefault,
     );
 
-    final bool ok = await ref.read(providerListProvider.notifier).save(
+    final bool ok = await ref
+        .read(providerListProvider.notifier)
+        .save(
           config,
           apiKey: _apiKey.text.trim().isEmpty ? null : _apiKey.text.trim(),
         );
@@ -240,9 +273,7 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
     if (!ok) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(content: Text('保存失败，请检查数据库是否可用')),
-        );
+        ..showSnackBar(const SnackBar(content: Text('保存失败，请检查数据库是否可用')));
       return;
     }
     Navigator.of(context).pop();
@@ -250,7 +281,9 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(widget.isEditing ? '已更新 ${config.name}' : '已添加 ${config.name}'),
+          content: Text(
+            widget.isEditing ? '已更新 ${config.name}' : '已添加 ${config.name}',
+          ),
         ),
       );
   }
@@ -353,7 +386,11 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
                   child: TextFormField(
                     controller: _model,
                     onChanged: _refreshCapabilities,
-                    decoration: const InputDecoration(labelText: '默认模型', hintText: 'deepseek-chat', prefixIcon: Icon(Icons.memory_outlined)),
+                    decoration: const InputDecoration(
+                      labelText: '默认模型',
+                      hintText: 'deepseek-chat',
+                      prefixIcon: Icon(Icons.memory_outlined),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -361,7 +398,13 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
                   padding: const EdgeInsets.only(top: 4),
                   child: OutlinedButton.icon(
                     onPressed: _loadingModels ? null : _fetchModels,
-                    icon: _loadingModels ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.download_outlined),
+                    icon: _loadingModels
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.download_outlined),
                     label: const Text('获取模型'),
                   ),
                 ),
@@ -370,27 +413,138 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
             if (_models.isNotEmpty) ...<Widget>[
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                initialValue: _models.contains(_model.text) ? _model.text : null,
+                initialValue: _models.contains(_model.text)
+                    ? _model.text
+                    : null,
                 decoration: const InputDecoration(labelText: '模型列表选择'),
-                items: _models.map((String model) => DropdownMenuItem<String>(value: model, child: Text(model))).toList(),
-                onChanged: (String? value) { if (value != null) { _model.text = value; _refreshCapabilities(value); } },
+                items: _models
+                    .map(
+                      (String model) => DropdownMenuItem<String>(
+                        value: model,
+                        child: Text(model),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (String? value) {
+                  if (value != null) {
+                    _model.text = value;
+                    _refreshCapabilities(value);
+                  }
+                },
               ),
             ],
             const SizedBox(height: 14),
             Text('Temperature：${_temperature.toStringAsFixed(1)}'),
-            Slider(value: _temperature, min: 0, max: 2, divisions: 20, onChanged: (double value) => setState(() => _temperature = value)),
-            TextField(controller: TextEditingController(text: _maxTokens.toString()), keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Max Tokens'), onSubmitted: (String value) { final parsed = int.tryParse(value); if (parsed != null) setState(() => _maxTokens = parsed.clamp(1, _capabilities.maxContextTokens)); }),
-            SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('手动覆盖最大上下文'), subtitle: Text(_manualContext ? '使用自定义上限 $_contextOverride tokens' : '使用模型能力档案 ${_capabilities.maxContextTokens} tokens'), value: _manualContext, onChanged: (bool value) => setState(() => _manualContext = value)),
+            Slider(
+              value: _temperature,
+              min: 0,
+              max: 2,
+              divisions: 20,
+              onChanged: (double value) => setState(() => _temperature = value),
+            ),
+            TextField(
+              controller: TextEditingController(text: _maxTokens.toString()),
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Max Tokens'),
+              onSubmitted: (String value) {
+                final parsed = int.tryParse(value);
+                if (parsed != null) {
+                  setState(
+                    () => _maxTokens = parsed.clamp(
+                      1,
+                      _capabilities.maxContextTokens,
+                    ),
+                  );
+                }
+              },
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('手动覆盖最大上下文'),
+              subtitle: Text(
+                _manualContext
+                    ? '使用自定义上限 $_contextOverride tokens'
+                    : '使用模型能力档案 ${_capabilities.maxContextTokens} tokens',
+              ),
+              value: _manualContext,
+              onChanged: (bool value) => setState(() => _manualContext = value),
+            ),
             if (_manualContext)
-              TextField(keyboardType: TextInputType.number, controller: TextEditingController(text: _contextOverride.toString()), decoration: const InputDecoration(labelText: '最大上下文 tokens'), onSubmitted: (String value) { final parsed = int.tryParse(value); if (parsed != null) setState(() => _contextOverride = parsed.clamp(1024, 1000000)); }),
+              TextField(
+                keyboardType: TextInputType.number,
+                controller: TextEditingController(
+                  text: _contextOverride.toString(),
+                ),
+                decoration: const InputDecoration(labelText: '最大上下文 tokens'),
+                onSubmitted: (String value) {
+                  final parsed = int.tryParse(value);
+                  if (parsed != null) {
+                    setState(
+                      () => _contextOverride = parsed.clamp(1024, 1000000),
+                    );
+                  }
+                },
+              ),
             Text('模型上下文档案：${_capabilities.maxContextTokens} tokens'),
-            Slider(value: (_manualContext ? _contextOverride : _capabilities.maxContextTokens).toDouble().clamp(1024, 1000000), min: 1024, max: 1000000, divisions: 100, onChanged: (double value) => setState(() { _contextOverride = value.toInt(); _manualContext = true; })),
-            SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('开启深度思考'), subtitle: Text(_capabilities.supportsThinking ? '当前模型支持' : '当前模型未检测到，可手动覆盖'), value: _thinking, onChanged: (bool value) => setState(() { _thinking = value; _manualThinking = true; })),
+            Slider(
+              value:
+                  (_manualContext
+                          ? _contextOverride
+                          : _capabilities.maxContextTokens)
+                      .toDouble()
+                      .clamp(1024, 1000000),
+              min: 1024,
+              max: 1000000,
+              divisions: 100,
+              onChanged: (double value) => setState(() {
+                _contextOverride = value.toInt();
+                _manualContext = true;
+              }),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('开启深度思考'),
+              subtitle: Text(
+                _capabilities.supportsThinking ? '当前模型支持' : '当前模型未检测到，可手动覆盖',
+              ),
+              value: _thinking,
+              onChanged: (bool value) => setState(() {
+                _thinking = value;
+                _manualThinking = true;
+              }),
+            ),
             if (_thinking && _capabilities.supportsThinkingLevels)
-              DropdownButtonFormField<String>(initialValue: _capabilities.thinkingLevels.contains(_thinkingLevel) ? _thinkingLevel : _capabilities.thinkingLevels.first, decoration: const InputDecoration(labelText: '思考等级'), items: _capabilities.thinkingLevels.map((String value) => DropdownMenuItem<String>(value: value, child: Text(value))).toList(), onChanged: (String? value) { if (value != null) setState(() => _thinkingLevel = value); }),
+              DropdownButtonFormField<String>(
+                initialValue:
+                    _capabilities.thinkingLevels.contains(_thinkingLevel)
+                    ? _thinkingLevel
+                    : _capabilities.thinkingLevels.first,
+                decoration: const InputDecoration(labelText: '思考等级'),
+                items: _capabilities.thinkingLevels
+                    .map(
+                      (String value) => DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (String? value) {
+                  if (value != null) setState(() => _thinkingLevel = value);
+                },
+              ),
             if (_thinking && _capabilities.supportsThinkingBudget) ...<Widget>[
               Text('思考预算：${_thinkingBudget.toInt()} tokens'),
-              Slider(value: _thinkingBudget.clamp(256, _capabilities.maxContextTokens.toDouble()), min: 256, max: _capabilities.maxContextTokens.toDouble(), divisions: 20, onChanged: (double value) => setState(() => _thinkingBudget = value)),
+              Slider(
+                value: _thinkingBudget.clamp(
+                  256,
+                  _capabilities.maxContextTokens.toDouble(),
+                ),
+                min: 256,
+                max: _capabilities.maxContextTokens.toDouble(),
+                divisions: 20,
+                onChanged: (double value) =>
+                    setState(() => _thinkingBudget = value),
+              ),
             ],
             const SizedBox(height: 14),
             TextFormField(
@@ -399,7 +553,8 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
               maxLines: 5,
               decoration: const InputDecoration(
                 labelText: '自定义 headers（可选）',
-                hintText: 'HTTP-Referer: https://example.com\nX-Title: Cup Memo',
+                hintText:
+                    'HTTP-Referer: https://example.com\nX-Title: Cup Memo',
                 alignLabelWithHint: true,
               ),
             ),

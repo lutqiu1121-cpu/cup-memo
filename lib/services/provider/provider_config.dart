@@ -137,10 +137,8 @@ class ProviderConfig {
       final Object? decoded = jsonDecode(raw);
       if (decoded is Map<String, dynamic>) {
         return decoded.map(
-          (String key, dynamic value) => MapEntry<String, String>(
-            key,
-            value?.toString() ?? '',
-          ),
+          (String key, dynamic value) =>
+              MapEntry<String, String>(key, value?.toString() ?? ''),
         );
       }
     } on FormatException {
@@ -151,7 +149,17 @@ class ProviderConfig {
 
   static List<String> decodeModels(String? raw) {
     if (raw == null || raw.trim().isEmpty) return const <String>[];
-    try { final Object? value = jsonDecode(raw); return value is List ? value.map((Object? item) => item.toString()).where((String item) => item.isNotEmpty).toList(growable: false) : const <String>[]; } catch (_) { return const <String>[]; }
+    try {
+      final Object? value = jsonDecode(raw);
+      return value is List
+          ? value
+                .map((Object? item) => item.toString())
+                .where((String item) => item.isNotEmpty)
+                .toList(growable: false)
+          : const <String>[];
+    } catch (_) {
+      return const <String>[];
+    }
   }
 
   static Map<String, dynamic> decodeParameters(String? raw) {
