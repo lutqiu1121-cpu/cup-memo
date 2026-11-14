@@ -19,7 +19,7 @@ class ModelCapabilities {
 
   ModelCapabilities copyWith({int? maxContextTokens, int? maxOutputTokens, bool? supportsThinking, List<String>? thinkingLevels, bool? supportsThinkingBudget, String? providerFormat, CapabilitySource? source}) {
     final int context = maxContextTokens ?? this.maxContextTokens;
-    return ModelCapabilities(model: model, maxContextTokens: context, maxOutputTokens: (maxOutputTokens ?? this.maxOutputTokens).clamp(1, context), supportsThinking: supportsThinking ?? this.supportsThinking, thinkingLevels: thinkingLevels ?? this.thinkingLevels, supportsThinkingBudget: supportsThinkingBudget ?? this.supportsThinkingBudget, providerFormat: providerFormat ?? this.providerFormat, source: source ?? this.source);
+    return ModelCapabilities(model: model, maxContextTokens: context, maxOutputTokens: (maxOutputTokens ?? this.maxOutputTokens).clamp(1, context).toInt(), supportsThinking: supportsThinking ?? this.supportsThinking, thinkingLevels: thinkingLevels ?? this.thinkingLevels, supportsThinkingBudget: supportsThinkingBudget ?? this.supportsThinkingBudget, providerFormat: providerFormat ?? this.providerFormat, source: source ?? this.source);
   }
 }
 
