@@ -369,6 +369,7 @@ class ChatPageState extends ConsumerState<ChatPage> {
     ]);
   }
   void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
         _scroll.animateTo(
           _scroll.position.maxScrollExtent,
