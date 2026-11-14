@@ -355,19 +355,6 @@ class ChatPageState extends ConsumerState<ChatPage> {
     );
   }
 
-  Widget _tokenDashboard(ProviderConfig? active) {
-    final int limit = ModelCapabilitiesRegistry.forModel(active?.defaultModel ?? '').maxContextTokens;
-    final int used = _estimatedContextTokens();
-    final double progress = (used / limit).clamp(0.0, 1.0);
-    final Color color = progress > .85 ? Theme.of(context).colorScheme.error : Theme.of(context).colorScheme.primary;
-    return Row(children: <Widget>[
-      Icon(Icons.speed_rounded, size: 14, color: color),
-      const SizedBox(width: 6),
-      Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: progress, minHeight: 4, backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest, color: color))),
-      const SizedBox(width: 8),
-      Text('$used / $limit', style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
-    ]);
-  }
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
@@ -461,11 +448,11 @@ class ChatPageState extends ConsumerState<ChatPage> {
                   ),
           ),
           Padding(padding: const EdgeInsets.fromLTRB(16, 4, 16, 0), child: Row(children: <Widget>[
-            FilterChip(avatar: const Icon(Icons.psychology_outlined, size: 16), label: const Text('深度思考'), selected: _thinkingEnabled, onSelected: (bool value) => setState(() => _thinkingEnabled = value)),
+            FilterChip(avatar: Icon(_thinkingEnabled ? Icons.psychology : Icons.psychology_outlined, size: 16), label: const Text('深度思考'), selected: _thinkingEnabled, onSelected: (bool value) => setState(() => _thinkingEnabled = value)),
             const SizedBox(width: 8),
-            FilterChip(avatar: const Icon(Icons.public, size: 16), label: const Text('联网搜索'), selected: _webSearch, onSelected: (bool value) => setState(() => _webSearch = value)),
+            FilterChip(avatar: Icon(_webSearch ? Icons.public : Icons.public_off, size: 16), label: const Text('联网搜索'), selected: _webSearch, onSelected: (bool value) => setState(() => _webSearch = value)),
           ])),
-          _tokenDashboard(active),
+
           SafeArea(
             top: false,
             child: Padding(

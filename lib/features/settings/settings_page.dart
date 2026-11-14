@@ -94,9 +94,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   Text('预设色板', style: theme.textTheme.titleSmall),
                   const SizedBox(height: 4),
                   Text(
-                    '选中的颜色只作为 seed color，页面背景始终固定为米白 #FAF7F0。',
+                    themeState.brightness == Brightness.dark ? '当前为深色模式' : '当前为浅色模式 · ${themeState.backgroundHex ?? '#FAF7F0'}',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -108,7 +108,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         Text(
                           group.key,
                           style: theme.textTheme.labelLarge?.copyWith(
-                            color: AppColors.textSecondary,
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -162,7 +162,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         child: Text(
                           '当前 seed：${themeState.hex}',
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ),
@@ -186,7 +186,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               DropdownMenuItem(value: ThemeModeChoice.light, child: Text('浅色')),
               DropdownMenuItem(value: ThemeModeChoice.dark, child: Text('深色')),
             ], onChanged: (ThemeModeChoice? value) { if (value != null) ref.read(themeControllerProvider.notifier).setBrightness(value == ThemeModeChoice.dark ? Brightness.dark : Brightness.light, system: value == ThemeModeChoice.system); })),
-            SwitchListTile(contentPadding: const EdgeInsets.symmetric(horizontal: 16), title: const Text('界面材质（液态玻璃）'), subtitle: const Text('开启后在支持设备上使用自适应毛玻璃效果'), value: themeState.glassEnabled, onChanged: (bool value) => ref.read(themeControllerProvider.notifier).setGlassEnabled(value)),
           ])),
           const SizedBox(height: 20),
           _SectionLabel(text: 'AI 与 Provider'),
@@ -292,7 +291,7 @@ class _SectionLabel extends StatelessWidget {
       child: Text(
         text,
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: AppColors.textSecondary,
+              color: theme.colorScheme.onSurfaceVariant,
               letterSpacing: 0.6,
             ),
       ),
@@ -312,9 +311,9 @@ class _ThemePreview extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.background,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEDE7DA)),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -322,7 +321,7 @@ class _ThemePreview extends StatelessWidget {
           Text(
             '实时预览',
             style: theme.textTheme.bodySmall?.copyWith(
-              color: AppColors.textSecondary,
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 10),
@@ -362,9 +361,8 @@ class _ThemePreview extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '背景固定米白 #FAF7F0，卡片白色、圆角 16、阴影柔和；'
-                    '主色由所选 seed 生成。',
-                    style: theme.textTheme.bodySmall?.copyWith(height: 1.5),
+                    theme.brightness == Brightness.dark ? '当前为深色模式' : '当前为浅色模式 · ${AppColors.toHex(theme.colorScheme.surface)}',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface, height: 1.5),
                   ),
                   const SizedBox(height: 12),
                   Row(

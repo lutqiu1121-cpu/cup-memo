@@ -9,7 +9,7 @@ import 'app_theme.dart';
 /// Immutable state of the theme layer.
 @immutable
 class ThemeState {
-  const ThemeState({required this.seedColor, required this.hex, this.brightness = Brightness.light, this.backgroundHex, this.systemMode = false, this.glassEnabled = false});
+  const ThemeState({required this.seedColor, required this.hex, this.brightness = Brightness.light, this.backgroundHex, this.systemMode = false});
 
   /// Seed colour used by [ThemeData] / `ColorScheme.fromSeed`.
   final Color seedColor;
@@ -19,16 +19,13 @@ class ThemeState {
   final Brightness brightness;
   final String? backgroundHex;
   final bool systemMode;
-  final bool glassEnabled;
-
-  ThemeState copyWith({Color? seedColor, String? hex, Brightness? brightness, String? backgroundHex, bool? systemMode, bool? glassEnabled}) {
+  ThemeState copyWith({Color? seedColor, String? hex, Brightness? brightness, String? backgroundHex, bool? systemMode}) {
     return ThemeState(
       seedColor: seedColor ?? this.seedColor,
       hex: hex ?? this.hex,
       brightness: brightness ?? this.brightness,
       backgroundHex: backgroundHex ?? this.backgroundHex,
       systemMode: systemMode ?? this.systemMode,
-      glassEnabled: glassEnabled ?? this.glassEnabled,
     );
   }
 }
@@ -42,7 +39,6 @@ class ThemeController extends Notifier<ThemeState> {
     final String? stored = prefs.getString(AppTheme.seedPrefsKey);
     final bool dark = prefs.getBool('cup_memo.theme.dark') ?? false;
     final bool systemMode = prefs.getBool('cup_memo.theme.system') ?? false;
-    final bool glass = prefs.getBool('cup_memo.theme.glass') ?? false;
     final String? background = prefs.getString('cup_memo.theme.background');
     final Color? parsed = stored == null ? null : AppColors.tryParseHex(stored);
     if (parsed == null) {
@@ -52,10 +48,9 @@ class ThemeController extends Notifier<ThemeState> {
         brightness: dark ? Brightness.dark : Brightness.light,
         backgroundHex: background,
         systemMode: systemMode,
-        glassEnabled: glass,
       );
     }
-    return ThemeState(seedColor: parsed, hex: AppColors.toHex(parsed), brightness: dark ? Brightness.dark : Brightness.light, backgroundHex: background, systemMode: systemMode, glassEnabled: glass);
+    return ThemeState(seedColor: parsed, hex: AppColors.toHex(parsed), brightness: dark ? Brightness.dark : Brightness.light, backgroundHex: background, systemMode: systemMode);
   }
 
   /// Applies [hex] (`#RRGGBB`, `RRGGBB`, …) and persists it.
@@ -84,10 +79,6 @@ class ThemeController extends Notifier<ThemeState> {
     await prefs.setBool('cup_memo.theme.system', system);
   }
 
-  Future<void> setGlassEnabled(bool enabled) async {
-    state = state.copyWith(glassEnabled: enabled);
-    await ref.read(sharedPreferencesProvider).setBool('cup_memo.theme.glass', enabled);
-  }
 
   Future<void> setBackgroundHex(String? hex) async {
     state = state.copyWith(backgroundHex: hex);

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
@@ -25,7 +24,7 @@ class CupMemoApp extends ConsumerWidget {
       theme: AppTheme.build(theme.seedColor, brightness: theme.brightness, backgroundColor: theme.backgroundHex == null ? null : AppColors.tryParseHex(theme.backgroundHex!)),
       darkTheme: AppTheme.build(theme.seedColor, brightness: Brightness.dark, backgroundColor: theme.backgroundHex == null ? const Color(0xFF121212) : AppColors.tryParseHex(theme.backgroundHex!)),
       themeMode: theme.systemMode ? ThemeMode.system : (theme.brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light),
-      builder: (BuildContext context, Widget? child) => AnnotatedRegion<SystemUiOverlayStyle>(value: appOverlayStyle, child: GlassAdaptiveScope(minQuality: GlassQuality.minimal, maxQuality: theme.glassEnabled ? GlassQuality.standard : GlassQuality.minimal, child: child ?? const SizedBox.shrink())),
+      builder: (BuildContext context, Widget? child) => AnnotatedRegion<SystemUiOverlayStyle>(value: appOverlayStyle, child: child ?? const SizedBox.shrink()),
       home: const HomeShell(),
     );
   }
@@ -53,7 +52,6 @@ class _HomeShellState extends State<HomeShell> {
       drawer: Drawer(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         child: Consumer(builder: (BuildContext context, WidgetRef ref, Widget? _) {
-          final bool glass = ref.watch(themeControllerProvider).glassEnabled;
           final Widget content = SafeArea(child: ListView(
             padding: const EdgeInsets.fromLTRB(8, 20, 8, 20),
             children: <Widget>[
@@ -72,7 +70,7 @@ class _HomeShellState extends State<HomeShell> {
                 ListTile(selectedTileColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.14), selectedColor: Theme.of(context).colorScheme.primary, leading: Icon(_icons[i]), title: Text(_labels[i]), selected: _index == i, onTap: () => _select(i)),
             ],
           ));
-          return glass ? GlassContainer.card(padding: EdgeInsets.zero, child: content) : content;
+          return content;
         }),
       ),
       body: IndexedStack(index: _index, children: _pages),
