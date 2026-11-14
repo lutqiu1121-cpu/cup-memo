@@ -57,6 +57,7 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
       _name.text = existing.name;
       _baseUrl.text = existing.baseUrl;
       _model.text = existing.defaultModel;
+      _models = existing.availableModels;
       _headers.text = ProviderConfig.headersToText(existing.extraHeaders);
       _kind = existing.kind;
       _isDefault = existing.isDefault;
