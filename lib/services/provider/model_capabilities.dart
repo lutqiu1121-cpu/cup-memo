@@ -1,117 +1,45 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
-/// Model capabilities are inferred from the model metadata / model id. Unknown
-/// models stay conservative: unsupported parameters are never sent.
+/// Runtime model capability resolution. Unknown models use only a conservative
+/// default; provider metadata and explicit user overrides are authoritative.
+enum CapabilitySource { manualOverride, providerMetadata, defaultFallback }
+
 @immutable
 class ModelCapabilities {
-  const ModelCapabilities({
-    required this.model,
-    this.maxContextTokens = 8192,
-    this.supportsThinking = false,
-    this.thinkingLevels = const <String>[],
-    this.supportsThinkingBudget = false,
-    this.providerFormat = 'openai',
-  });
-
+  const ModelCapabilities({required this.model, this.maxContextTokens = 8192, this.maxOutputTokens = 4096, this.supportsThinking = false, this.thinkingLevels = const <String>[], this.supportsThinkingBudget = false, this.providerFormat = 'openai', this.source = CapabilitySource.defaultFallback});
   final String model;
   final int maxContextTokens;
+  final int maxOutputTokens;
   final bool supportsThinking;
   final List<String> thinkingLevels;
   final bool supportsThinkingBudget;
   final String providerFormat;
-
+  final CapabilitySource source;
   bool get supportsThinkingLevels => thinkingLevels.isNotEmpty;
 
-  ModelCapabilities copyWith({
-    int? maxContextTokens,
-    bool? supportsThinking,
-    List<String>? thinkingLevels,
-    bool? supportsThinkingBudget,
-    String? providerFormat,
-  }) {
-    return ModelCapabilities(
-      model: model,
-      maxContextTokens: maxContextTokens ?? this.maxContextTokens,
-      supportsThinking: supportsThinking ?? this.supportsThinking,
-      thinkingLevels: thinkingLevels ?? this.thinkingLevels,
-      supportsThinkingBudget:
-          supportsThinkingBudget ?? this.supportsThinkingBudget,
-      providerFormat: providerFormat ?? this.providerFormat,
-    );
+  ModelCapabilities copyWith({int? maxContextTokens, int? maxOutputTokens, bool? supportsThinking, List<String>? thinkingLevels, bool? supportsThinkingBudget, String? providerFormat, CapabilitySource? source}) {
+    final int context = maxContextTokens ?? this.maxContextTokens;
+    return ModelCapabilities(model: model, maxContextTokens: context, maxOutputTokens: (maxOutputTokens ?? this.maxOutputTokens).clamp(1, context), supportsThinking: supportsThinking ?? this.supportsThinking, thinkingLevels: thinkingLevels ?? this.thinkingLevels, supportsThinkingBudget: supportsThinkingBudget ?? this.supportsThinkingBudget, providerFormat: providerFormat ?? this.providerFormat, source: source ?? this.source);
   }
 }
 
 class ModelCapabilitiesRegistry {
   const ModelCapabilitiesRegistry._();
 
-  static ModelCapabilities forModel(String model) {
-    final String id = model.toLowerCase();
-    if (id.contains('deepseek-reasoner') || id.contains('deepseek-r1')) {
-      return ModelCapabilities(
-        model: model,
-        maxContextTokens: 65536,
-        supportsThinking: true,
-        thinkingLevels: const <String>['low', 'medium', 'high'],
-      );
-    }
-    if (id.contains('o1') || id.contains('o3') || id.contains('reasoning')) {
-      return ModelCapabilities(
-        model: model,
-        maxContextTokens: 128000,
-        supportsThinking: true,
-        thinkingLevels: const <String>['low', 'medium', 'high'],
-      );
-    }
-    if (id.contains('claude-3-7') || id.contains('claude-sonnet-4')) {
-      return ModelCapabilities(
-        model: model,
-        maxContextTokens: 200000,
-        supportsThinking: true,
-        supportsThinkingBudget: true,
-        providerFormat: 'anthropic',
-      );
-    }
-    if (id.contains('gemini-1.5') || id.contains('gemini-2')) {
-      return ModelCapabilities(
-        model: model,
-        maxContextTokens: 1000000,
-        supportsThinking: true,
-        supportsThinkingBudget: true,
-        providerFormat: 'gemini',
-      );
-    }
-    if (id.contains('qwen3')) {
-      return ModelCapabilities(
-        model: model,
-        maxContextTokens: 32768,
-        supportsThinking: true,
-        supportsThinkingBudget: true,
-      );
-    }
-    return ModelCapabilities(model: model);
+  static ModelCapabilities resolveModelCaps({required String model, Map<String, dynamic>? providerMetadata, Map<String, dynamic>? manualOverride}) {
+    ModelCapabilities resolved = ModelCapabilities(model: model);
+    if (providerMetadata != null && providerMetadata.isNotEmpty) resolved = _applyMetadata(resolved, providerMetadata, CapabilitySource.providerMetadata);
+    if (manualOverride != null && manualOverride.isNotEmpty) resolved = _applyMetadata(resolved, manualOverride, CapabilitySource.manualOverride);
+    return resolved;
   }
 
-  static ModelCapabilities fromModelMetadata(
-    String model,
-    Map<String, dynamic> metadata,
-  ) {
-    final ModelCapabilities base = forModel(model);
-    final dynamic context = metadata['context_length'] ??
-        metadata['max_context_tokens'] ??
-        metadata['context_window'];
+  static ModelCapabilities forModel(String model, {Map<String, dynamic>? providerMetadata, Map<String, dynamic>? manualOverride}) => resolveModelCaps(model: model, providerMetadata: providerMetadata, manualOverride: manualOverride);
+  static ModelCapabilities fromModelMetadata(String model, Map<String, dynamic> metadata) => resolveModelCaps(model: model, providerMetadata: metadata);
+
+  static ModelCapabilities _applyMetadata(ModelCapabilities base, Map<String, dynamic> metadata, CapabilitySource source) {
+    final dynamic context = metadata['context_override'] ?? metadata['context_length'] ?? metadata['max_context_tokens'] ?? metadata['context_window'];
+    final dynamic output = metadata['max_tokens'] ?? metadata['max_output_tokens'];
     final dynamic levels = metadata['thinking_levels'];
-    return base.copyWith(
-      maxContextTokens: context is num ? context.toInt() : null,
-      supportsThinking: metadata['supports_thinking'] is bool
-          ? metadata['supports_thinking'] as bool
-          : null,
-      thinkingLevels: levels is List
-          ? levels.map((Object? value) => value.toString()).toList()
-          : null,
-      supportsThinkingBudget: metadata['supports_thinking_budget'] is bool
-          ? metadata['supports_thinking_budget'] as bool
-          : null,
-      providerFormat: metadata['provider_format']?.toString(),
-    );
+    return base.copyWith(maxContextTokens: context is num ? context.toInt().clamp(1, 10000000) : null, maxOutputTokens: output is num ? output.toInt() : null, supportsThinking: metadata['thinking_override'] is bool ? metadata['thinking_override'] as bool : (metadata['supports_thinking'] is bool ? metadata['supports_thinking'] as bool : null), thinkingLevels: levels is List ? levels.map((Object? value) => value.toString()).toList(growable: false) : null, supportsThinkingBudget: metadata['supports_thinking_budget'] is bool ? metadata['supports_thinking_budget'] as bool : null, providerFormat: metadata['provider_format']?.toString(), source: source);
   }
 }

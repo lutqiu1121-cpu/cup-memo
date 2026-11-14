@@ -40,6 +40,7 @@ class ProviderConfig {
     required this.baseUrl,
     required this.apiKeyRef,
     required this.defaultModel,
+    this.availableModels = const <String>[],
     this.extraHeaders = const <String, String>{},
     this.modelParameters = const <String, dynamic>{},
     this.isDefault = false,
@@ -53,6 +54,7 @@ class ProviderConfig {
   /// `flutter_secure_storage` key under which the API key is stored.
   final String apiKeyRef;
   final String defaultModel;
+  final List<String> availableModels;
 
   /// Additional HTTP headers (e.g. OpenRouter's `HTTP-Referer`).
   final Map<String, String> extraHeaders;
@@ -79,6 +81,7 @@ class ProviderConfig {
       baseUrl: row['base_url'] as String? ?? '',
       apiKeyRef: row['api_key_ref'] as String? ?? '',
       defaultModel: row['default_model'] as String? ?? '',
+      availableModels: decodeModels(row['available_models'] as String?),
       extraHeaders: decodeHeaders(row['extra_headers'] as String?),
       modelParameters: decodeParameters(row['model_parameters'] as String?),
       isDefault: ((row['is_default'] as int?) ?? 0) != 0,
@@ -93,6 +96,7 @@ class ProviderConfig {
       'base_url': baseUrl,
       'api_key_ref': apiKeyRef,
       'default_model': defaultModel,
+      'available_models': jsonEncode(availableModels),
       'extra_headers': extraHeadersJson,
       'model_parameters': jsonEncode(modelParameters),
       'is_default': isDefault ? 1 : 0,
@@ -105,6 +109,7 @@ class ProviderConfig {
     String? baseUrl,
     String? apiKeyRef,
     String? defaultModel,
+    List<String>? availableModels,
     Map<String, String>? extraHeaders,
     Map<String, dynamic>? modelParameters,
     bool? isDefault,
@@ -116,6 +121,7 @@ class ProviderConfig {
       baseUrl: baseUrl ?? this.baseUrl,
       apiKeyRef: apiKeyRef ?? this.apiKeyRef,
       defaultModel: defaultModel ?? this.defaultModel,
+      availableModels: availableModels ?? this.availableModels,
       extraHeaders: extraHeaders ?? this.extraHeaders,
       modelParameters: modelParameters ?? this.modelParameters,
       isDefault: isDefault ?? this.isDefault,
@@ -141,6 +147,11 @@ class ProviderConfig {
       // Corrupted / hand-edited value: fall back to "no extra headers".
     }
     return const <String, String>{};
+  }
+
+  static List<String> decodeModels(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return const <String>[];
+    try { final Object? value = jsonDecode(raw); return value is List ? value.map((Object? item) => item.toString()).where((String item) => item.isNotEmpty).toList(growable: false) : const <String>[]; } catch (_) { return const <String>[]; }
   }
 
   static Map<String, dynamic> decodeParameters(String? raw) {

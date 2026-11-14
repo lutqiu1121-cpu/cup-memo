@@ -103,6 +103,9 @@ class AppDatabase {
     if (oldVersion < 5) {
       db.execute('ALTER TABLE chat_sessions ADD COLUMN message_count INTEGER DEFAULT 0');
     }
+    if (oldVersion < 6) {
+      db.execute("ALTER TABLE providers ADD COLUMN available_models TEXT DEFAULT '[]'");
+    }
   }
 
   /// Closes the underlying connection. Safe to call once.
