@@ -125,6 +125,7 @@ class ChatPageState extends ConsumerState<ChatPage> {
     }
     final List<String> prompts = <String>[
       '【以下是用户设定的项目背景，请优先参考，但不要擅自修改】\n${blocks.join('\n')}',
+      '【本地工具说明】你可以使用备忘录、任务工具，以及 fetch_github_file 和 commit_github_file 读取或写入 GitHub；只有用户明确要求时才写入。',
     ];
     if (_webSearch) {
       final List<Entry> hits = await service.search(query);
