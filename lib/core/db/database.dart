@@ -9,6 +9,7 @@ import 'dao/entry_dao.dart';
 import 'dao/provider_dao.dart';
 import 'dao/task_dao.dart';
 import 'dao/session_dao.dart';
+import 'dao/chat_message_dao.dart';
 import 'schema.dart';
 
 /// Thin hand-written wrapper around a [Database] connection.
@@ -20,7 +21,8 @@ class AppDatabase {
     : providerDao = ProviderDao(_db),
       entryDao = EntryDao(_db),
       taskDao = TaskDao(_db),
-      sessionDao = SessionDao(_db);
+      sessionDao = SessionDao(_db),
+      chatMessageDao = ChatMessageDao(_db);
 
   final Database _db;
 
@@ -32,6 +34,7 @@ class AppDatabase {
   final EntryDao entryDao;
   final TaskDao taskDao;
   final SessionDao sessionDao;
+  final ChatMessageDao chatMessageDao;
 
   /// Escape hatch for future DAOs / tests.
   Database get raw => _db;
@@ -114,6 +117,11 @@ class AppDatabase {
     if (oldVersion < 6) {
       db.execute(
         "ALTER TABLE providers ADD COLUMN available_models TEXT DEFAULT '[]'",
+      );
+    }
+    if (oldVersion < 7) {
+      db.execute(
+        "CREATE TABLE IF NOT EXISTS chat_messages (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, parent_id TEXT, children_ids TEXT DEFAULT '[]', role TEXT NOT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL, provider_id TEXT, model TEXT, active INTEGER DEFAULT 1)",
       );
     }
   }

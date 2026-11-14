@@ -7,7 +7,7 @@ class Schema {
   const Schema._();
 
   /// Current database version, mirrored into `PRAGMA user_version`.
-  static const int version = 7;
+  static const int version = 8;
 
   /// File name of the database inside the application support directory.
   static const String databaseFileName = 'cup_memo.db';

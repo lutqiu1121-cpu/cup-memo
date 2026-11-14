@@ -299,10 +299,24 @@ class ChatPageState extends ConsumerState<ChatPage> {
     ];
   }
 
+  String _friendlyError(Object error) {
+    final String text = error.toString().toLowerCase();
+    if (text.contains('401') || text.contains('403')) return 'API 密钥无效或未授权';
+    if (text.contains('timeout') || text.contains('timed out')) {
+      return '网络连接超时，请检查网络';
+    }
+    if (text.contains('html') || text.contains('waf') || text.contains('5')) {
+      return '请求被服务器拦截或中转站异常';
+    }
+    return '请求失败，请检查服务商设置后重试';
+  }
+
   Future<void> _send() async {
     final int turnId = ++_activeTurnId;
     final String text = _input.text.trim();
-    if (text.isEmpty || _sending) return;
+    if (text.isEmpty || _sending) {
+      return;
+    }
     final ProviderRouter? router = await ref.read(
       providerRouterProvider.future,
     );
@@ -326,6 +340,7 @@ class ChatPageState extends ConsumerState<ChatPage> {
     final String assistantId = newMessageId();
     setState(() {
       _messages.add(user);
+      ref.read(databaseProvider)?.chatMessageDao.upsert(user);
       ref
           .read(databaseProvider)
           ?.sessionDao
@@ -366,7 +381,10 @@ class ChatPageState extends ConsumerState<ChatPage> {
           createdAt: old.createdAt,
           providerId: old.providerId,
           model: old.model,
+          parentId: old.parentId,
+          childrenIds: old.childrenIds,
         );
+        ref.read(databaseProvider)?.chatMessageDao.upsert(_messages[index]);
       });
       _scrollToBottom();
     }
@@ -414,7 +432,7 @@ class ChatPageState extends ConsumerState<ChatPage> {
             id: old.id,
             sessionId: old.sessionId,
             role: old.role,
-            content: '请求失败：$error',
+            content: _friendlyError(error),
             createdAt: old.createdAt,
             providerId: old.providerId,
             model: old.model,

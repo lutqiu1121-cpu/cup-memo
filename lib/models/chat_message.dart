@@ -78,6 +78,9 @@ class ChatMessage {
       model: row['model'] as String?,
       parentId: row['parent_id'] as String?,
       childrenIds: (row['children_ids'] as String? ?? '')
+          .replaceAll('[', '')
+          .replaceAll(']', '')
+          .replaceAll('"', '')
           .split(',')
           .where((String id) => id.isNotEmpty)
           .toList(growable: false),
