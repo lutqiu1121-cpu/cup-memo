@@ -10,8 +10,8 @@ Cup Memo 本身使用 GNU AGPL-3.0（见根目录 `LICENSE`）。本文件记录
 - 发现的主要许可证：MIT、BSD-3-Clause、Apache-2.0；SQLite 本体为 Public Domain。
 - 本仓库没有复制第三方 Dart/Flutter 源码；DAO、tokenizer、原子文件与 UI 均为本项目代码。
 - `flutter_launcher_icons` 仅是开发期 MIT 工具；Pillow 仅用于本地图标转换，不进入 APK。
-- `assets/icon/app_icon.png` 是用户提供的图片，不是开源依赖；其版权/商用授权需要由素材
-  提供者确认，这是本次审查中唯一无法从仓库内部证明的素材风险。
+- `assets/icon/app_icon.svg` 与由其生成的 `app_icon.png` 是本项目原创图形，不是第三方依赖。
+  `tool/render_app_icon.py` 只使用仓库内 SVG 几何与颜色参数生成 PNG；不再使用或提交外部图片素材。
 
 ## 直接依赖与主动使用的工具
 
@@ -142,11 +142,11 @@ Cup Memo 本身使用 GNU AGPL-3.0（见根目录 `LICENSE`）。本文件记录
 
 - 没有复制 flutter_riverpod、Flutter Material、Dio、SQLite 或其他项目源码片段。
 - UI、搜索高亮、任务列表、EntryDao、TaskDao、tokenizer、原子文件均为本项目实现。
-- App 图标使用用户上传素材；不应将其声明为第三方开源素材。
+- App 图标使用仓库内原创 SVG 几何稿与渲染脚本，不声明为第三方开源素材。
 
 ## 下游分发注意事项
 
 1. 分发 APK 时保留本文件、`LICENSE`、Flutter 自动汇总的 notices，以及各依赖要求的版权/许可证文本。
 2. AGPL-3.0 项目分发 APK 时应提供对应版本完整源码；若未来提供网络服务，还需注意 AGPL 第 13 条源码提供义务。
-3. Android SDK、签名密钥、用户 API Key、用户提供图标授权须分别管理。
+3. Android SDK、签名密钥和用户 API Key 不等同于项目源码许可证，须分别管理。
 4. 本文件是工程级合规清单，不是法律意见；正式商业发布前建议律师复核素材授权、APK 源码提供方式及 Android/Flutter notices。

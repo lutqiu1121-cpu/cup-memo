@@ -34,7 +34,7 @@
 | --- | --- | --- |
 | 底部导航（备忘录 / 搜索 / 会话 / 任务 / 设置） | ✅ | 5 个 tab，切换正常，占位空状态 |
 | 主题系统（分类预设色板 + 自定义 hex + 持久化） | ✅ | 背景固定米白 `#FAF7F0`，卡片白色圆角 16 |
-| App 图标（用户提供的微拟物咖啡杯 / 自适应图标） | ✅ | `assets/icon/app_icon.png`，Android 13 自适应背景/透明前景 |
+| App 图标（原创 SVG 几何稿 / 自适应图标） | ✅ | `assets/icon/app_icon.png`，Android 13 自适应背景/透明前景 |
 | Provider 管理（增删改、设默认、预设） | ✅ | 列表 / 添加 / 编辑 / 删除 / 设为默认，API Key 进安全存储 |
 | 会话页 Provider 切换 | ✅ | 顶部显示当前 Provider，点击切换，仅影响后续消息 |
 | 数据库建表（含 FTS5） | ✅ | schema version 1，`onUpgrade` 空实现 + 注释 |
@@ -311,8 +311,8 @@ class PresetTheme {
 
 ## App 图标
 
-- 最终源图：`assets/icon/app_icon.png`（用户提供的 2048×2048 微拟物咖啡杯图标）。
-- 配置：`image_path` 指向 `assets/icon/app_icon.png`；同一源图作为 adaptive background，
+- 最终源图：`assets/icon/app_icon.svg`（本项目原创 2048×2048 几何稿）；`app_icon.png` 是由该 SVG 几何参数生成的 PNG，不再依赖外部图片素材。
+- 配置：`image_path` 指向 `assets/icon/app_icon.png`；同一原创图形作为 adaptive background，
   透明前景层负责 Android 13 自适应结构，避免背景方块接缝。
 - 配置在 `pubspec.yaml` 的 `flutter_launcher_icons` 段，重新生成：
 
@@ -321,11 +321,9 @@ class PresetTheme {
   ```
 
   会写入 `mipmap-*dpi/ic_launcher.png`、`mipmap-anydpi-v26/ic_launcher.xml`
-  （自适应：背景 `@color/ic_launcher_background` = `#FAF7F0`、前景 inset 16%、
-  monochrome）与 `values/colors.xml`。
-- 说明：本机没有可用的 SVG 光栅化器，PNG 由与本 SVG 几何一致的脚本按 4× 超采样
-  烘焙，避免 SVG `filter`/`gradient` 在转 PNG 时丢失——阴影用三层半透明椭圆实现，
-  不依赖滤镜。
+  （自适应：背景图使用原创 `app_icon.png`，透明前景 inset 0%）与 `values/colors.xml`。
+- `tool/render_app_icon.py` 是 PNG 烘焙脚本；它只使用仓库内的 SVG 几何与颜色参数，
+  不读取外部图片。阴影用三层半透明椭圆实现，不依赖 SVG filter/gradient。
 
 ## 条目与索引（EntryDao）
 

@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2048" height="2048" viewBox="0 0 2048 2048" role="img" aria-label="Original Cup Memo coffee cup artwork">
+  <!-- Original Cup Memo artwork. No external path or image is embedded. -->
+  <rect width="2048" height="2048" rx="360" fill="#EFE9DD"/>
+
+  <!-- Layered, filter-free grounding shadow. -->
+  <ellipse cx="1024" cy="1535" rx="530" ry="92" fill="#8B8174" opacity="0.08"/>
+  <ellipse cx="1024" cy="1518" rx="395" ry="58" fill="#8B8174" opacity="0.10"/>
+  <ellipse cx="1024" cy="1504" rx="265" ry="34" fill="#8B8174" opacity="0.12"/>
+
+  <!-- One original steam ribbon, built from cubic curves. -->
+  <path d="M1018 625 C927 550 1088 464 1005 372 C946 307 1002 237 1055 193"
+        fill="none" stroke="#625A50" stroke-width="30"
+        stroke-linecap="round" stroke-linejoin="round" opacity="0.88"/>
+
+  <!-- A small rear rim highlight gives the cup its ceramic volume. -->
+  <ellipse cx="1000" cy="785" rx="455" ry="134" fill="#D9D0C2" opacity="0.55"/>
+
+  <!-- Main ceramic cup body: original rounded bowl silhouette. -->
+  <path d="M575 795
+           C592 1030 622 1280 720 1402
+           C808 1512 928 1552 1042 1552
+           C1157 1552 1277 1512 1364 1402
+           C1462 1280 1491 1030 1508 795
+           C1360 864 1211 900 1042 900
+           C873 900 724 864 575 795 Z"
+        fill="#F8F5EF" stroke="#514A42" stroke-width="28"
+        stroke-linejoin="round"/>
+
+  <!-- Ceramic side shade: flat, subtle, no complex gradient. -->
+  <path d="M1340 867 C1325 1115 1282 1310 1204 1402
+           C1147 1469 1096 1494 1042 1511
+           C1205 1514 1323 1459 1380 1363
+           C1455 1238 1481 1015 1493 827 Z"
+        fill="#D8D1C6" opacity="0.52"/>
+
+  <!-- Coffee surface and inner rim. -->
+  <ellipse cx="1042" cy="787" rx="466" ry="145" fill="#FDFBF7"
+           stroke="#514A42" stroke-width="28"/>
+  <ellipse cx="1042" cy="800" rx="364" ry="84" fill="#8D674D"
+           stroke="#514A42" stroke-width="22"/>
+  <path d="M760 788 C876 738 1162 720 1320 793"
+        fill="none" stroke="#B99679" stroke-width="22"
+        stroke-linecap="round" opacity="0.82"/>
+  <ellipse cx="900" cy="768" rx="90" ry="23" fill="#D9BDA5" opacity="0.48"/>
+
+  <!-- Handle, behind the body but in the same original line language. -->
+  <path d="M1468 932 C1716 871 1790 1010 1770 1168
+           C1744 1368 1533 1414 1358 1320"
+        fill="none" stroke="#514A42" stroke-width="30"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M1485 1002 C1621 972 1684 1042 1667 1150
+           C1648 1268 1531 1288 1425 1247"
+        fill="none" stroke="#D8D1C6" stroke-width="52"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Front ceramic highlight, kept deliberately simple. -->
+  <path d="M750 1010 C764 1200 800 1324 872 1380"
+        fill="none" stroke="#FFFFFF" stroke-width="34"
+        stroke-linecap="round" opacity="0.62"/>
+</svg>
