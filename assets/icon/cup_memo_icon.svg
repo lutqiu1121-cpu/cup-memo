@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="Cup Memo coffee cup icon">
+  <rect width="1024" height="1024" fill="#FAF7F0"/>
+  <!-- Three simple translucent ellipses create a renderer-independent soft shadow. -->
+  <ellipse cx="512" cy="755" rx="250" ry="28" fill="#3A3A3A" opacity="0.035"/>
+  <ellipse cx="512" cy="750" rx="205" ry="20" fill="#3A3A3A" opacity="0.045"/>
+  <ellipse cx="512" cy="745" rx="155" ry="13" fill="#3A3A3A" opacity="0.055"/>
+
+  <!-- One wisp of steam. -->
+  <path d="M512 290 C474 250 552 216 512 170 C480 132 516 106 538 82"
+        fill="none" stroke="#3A3A3A" stroke-width="16"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Cup body: a very light inner fill plus one consistent dark outline. -->
+  <path d="M294 430 L730 430 L684 684 Q676 728 630 746 Q572 768 512 768 Q452 768 394 746 Q348 728 340 684 Z"
+        fill="#F1EEE7" stroke="#3A3A3A" stroke-width="16"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Rim / coffee surface. -->
+  <ellipse cx="512" cy="430" rx="218" ry="62"
+           fill="#FAF7F0" stroke="#3A3A3A" stroke-width="16"/>
+  <!-- Minimal handle, kept as part of the same cup silhouette. -->
+  <path d="M728 482 Q842 472 842 572 Q842 670 690 642"
+        fill="none" stroke="#3A3A3A" stroke-width="16"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

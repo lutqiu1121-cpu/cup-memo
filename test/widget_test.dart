@@ -47,7 +47,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('马卡龙预设色'), findsOneWidget);
+    expect(find.text('预设色板'), findsOneWidget);
     expect(find.text('恢复默认米白'), findsOneWidget);
 
     // Switch to the chat tab: provider entry points must be visible.

@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import 'dao/entry_dao.dart';
 import 'dao/provider_dao.dart';
 import 'schema.dart';
 
@@ -12,12 +13,18 @@ import 'schema.dart';
 /// There is no `build_runner` / drift code generation in this project: every
 /// statement lives in plain SQL (see [Schema] and `ProviderDao`).
 class AppDatabase {
-  AppDatabase._(this._db) : providerDao = ProviderDao(_db);
+  AppDatabase._(this._db, this.storageDirectory)
+      : providerDao = ProviderDao(_db),
+        entryDao = EntryDao(_db);
 
   final Database _db;
 
-  /// Hand-written DAO for the `providers` table.
+  /// Directory used for Markdown entry bodies and the database file.
+  final Directory storageDirectory;
+
+  /// Hand-written DAOs.
   final ProviderDao providerDao;
+  final EntryDao entryDao;
 
   /// Escape hatch for future DAOs / tests.
   Database get raw => _db;
@@ -48,7 +55,7 @@ class AppDatabase {
       onUpgrade(db, currentVersion, Schema.version);
       db.userVersion = Schema.version;
     }
-    return AppDatabase._(db);
+    return AppDatabase._(db, Directory(p.dirname(path)));
   }
 
   static void _createSchema(Database db) {

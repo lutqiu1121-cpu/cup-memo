@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/db/database.dart';
 import '../services/archive_service.dart';
+import '../services/entry_service.dart';
 import '../services/provider/api_key_store.dart';
 import '../services/provider/provider_config.dart';
 import '../services/provider/provider_router.dart';
@@ -24,6 +25,13 @@ final Provider<SharedPreferences> sharedPreferencesProvider =
 /// gracefully instead of crashing at launch.
 final Provider<AppDatabase?> databaseProvider =
     Provider<AppDatabase?>((Ref ref) => null);
+
+final Provider<EntryService?> entryServiceProvider = Provider<EntryService?>(
+  (Ref ref) {
+    final AppDatabase? db = ref.watch(databaseProvider);
+    return db == null ? null : EntryService(db);
+  },
+);
 
 /// API keys live in the platform keystore, never in the database.
 final Provider<ApiKeyStore> apiKeyStoreProvider = Provider<ApiKeyStore>(

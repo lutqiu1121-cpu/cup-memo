@@ -85,7 +85,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text('马卡龙预设色', style: theme.textTheme.titleSmall),
+                  Text('预设色板', style: theme.textTheme.titleSmall),
                   const SizedBox(height: 4),
                   Text(
                     '选中的颜色只作为 seed color，页面背景始终固定为米白 #FAF7F0。',
@@ -94,18 +94,36 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      for (final MacaronColor preset in AppColors.macaronPalette)
-                        _SwatchButton(
-                          preset: preset,
-                          selected: themeState.hex == preset.hex,
-                          onTap: () => ref
-                              .read(themeControllerProvider.notifier)
-                              .setPreset(preset),
+                      for (final MapEntry<String, List<PresetTheme>> group
+                          in AppColors.presetsByCategory.entries) ...<Widget>[
+                        Text(
+                          group.key,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
                         ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: <Widget>[
+                            for (final PresetTheme preset in group.value)
+                              _SwatchButton(
+                                preset: preset,
+                                selected: themeState.hex == preset.hex,
+                                onTap: () => ref
+                                    .read(themeControllerProvider.notifier)
+                                    .setPreset(preset),
+                              ),
+                          ],
+                        ),
+                        if (group.key !=
+                            AppColors.presetsByCategory.keys.last)
+                          const SizedBox(height: 14),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 18),
@@ -336,7 +354,7 @@ class _SwatchButton extends StatelessWidget {
     required this.onTap,
   });
 
-  final MacaronColor preset;
+  final PresetTheme preset;
   final bool selected;
   final VoidCallback onTap;
 

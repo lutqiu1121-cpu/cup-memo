@@ -31,12 +31,14 @@
 | 模块 | 状态 | 说明 |
 | --- | --- | --- |
 | 底部导航（备忘录 / 搜索 / 会话 / 任务 / 设置） | ✅ | 5 个 tab，切换正常，占位空状态 |
-| 主题系统（马卡龙 seed + 自定义 hex + 持久化） | ✅ | 背景固定米白 `#FAF7F0`，卡片白色圆角 16 |
+| 主题系统（分类预设色板 + 自定义 hex + 持久化） | ✅ | 背景固定米白 `#FAF7F0`，卡片白色圆角 16 |
+| App 图标（极简咖啡杯 / 自适应图标） | ✅ | SVG 源 + 多密度 PNG，Android 13 自适应 + monochrome |
 | Provider 管理（增删改、设默认、预设） | ✅ | 列表 / 添加 / 编辑 / 删除 / 设为默认，API Key 进安全存储 |
 | 会话页 Provider 切换 | ✅ | 顶部显示当前 Provider，点击切换，仅影响后续消息 |
 | 数据库建表（含 FTS5） | ✅ | schema version 1，`onUpgrade` 空实现 + 注释 |
 | `cjk_tokenizer` bigram 预处理 | ✅ | 中英混排，写入 / 查询复用同一函数 |
-| 条目 CRUD / Markdown 落盘 | ⛔ | 后续阶段 |
+| 条目 CRUD / Markdown 落盘 / 分类筛选 | ✅ | `EntryDao` 手写 SQL，正文原子写入 `entries/<id>.md` |
+| 条目全文索引（FTS5 + bigram 同步） | ✅ | 写/改/删同步维护 `entries_fts`，`content_hash` 去重 |
 | 搜索（FTS5 查询、SearchRegistry 实现） | ⛔ | 后续阶段，接口与 registry 已就位 |
 | AI 真实调用（ProviderRouter 客户端） | ⛔ | `sendMessage` 抛 `UnimplementedError` |
 | 任务 / 归档业务逻辑 | ⛔ | 后续阶段，`ArchiveService.archiveSession` 返回 `null` |
@@ -64,13 +66,14 @@ lib/
   app.dart                      # MaterialApp + 5 tab 的 HomeShell
   core/
     theme/
-      app_colors.dart           # 固定色 + 7 个马卡龙预设 + hex 解析
+      app_colors.dart           # 固定色 + PresetTheme 分类色板 + hex 解析
       app_theme.dart            # ColorScheme.fromSeed + 米白背景/卡片/AppBar 规则
       theme_controller.dart     # ThemeController（Riverpod）持久化 seedColor
     db/
       database.dart             # AppDatabase：打开、建表、版本、onUpgrade 空实现
       schema.dart               # 全部建表 SQL（含 entries_fts）
       dao/provider_dao.dart     # 手写 DAO：providers 表 CRUD
+      dao/entry_dao.dart        # 手写 DAO：entries + entries_fts 同步、去重、检索
     utils/
       cjk_tokenizer.dart        # 中文 bigram 预处理（写入/查询共用）
       atomic_file.dart          # 临时文件 + rename 的原子写入
@@ -79,7 +82,7 @@ lib/
       empty_state.dart          # 占位空状态卡片 + SnackBar 工具
   features/
     archive/archive_page.dart     # 归档占位页（设置 → 归档）
-    entries/entries_page.dart
+    entries/entries_page.dart     # 备忘录列表 + 新建/编辑页（EntryEditPage）
     search/search_page.dart
     chat/chat_page.dart
     tasks/tasks_page.dart
@@ -97,6 +100,8 @@ lib/
       search_provider.dart      # SearchProvider 接口
       search_registry.dart      # 注册 / 当前 provider / fallback 链
     archive_service.dart        # archiveSession -> null
+  services/
+    entry_service.dart          # 条目 + Markdown 文件的事务协调（EntryService）
   models/
     entry.dart  task.dart  chat_message.dart  search_result.dart
   providers/
@@ -266,6 +271,8 @@ flutter test
 - `cjk_tokenizer` 的 bigram 切分、英文数字保留、标点分隔
 - hex 颜色解析 / 归一化、主题强制米白背景与 16px 圆角、seed 持久化
 - 5 个 tab 渲染与切换、占位按钮的 SnackBar
+- `EntryDao`（`test/entry_dao_test.dart`）：写入「备忘录索引设计」后，「索引」「备忘」
+  均可命中；更新后旧词失效、新词命中；删除后 FTS 行同步清理；`content_hash` 去重
 
 ## 数据库与中文分词
 
@@ -282,6 +289,55 @@ flutter test
 
   写入与查询必须调用同一个函数，才能让两边的 token 流对齐；**不使用 trigram**。
 
+## 预设色板
+
+颜色不再写死在 UI 里，而是 `app_colors.dart` 中的 `PresetTheme` 数据：
+
+```dart
+class PresetTheme {
+  final String name;      // 薄荷 / 蜜桃 …
+  final String hex;       // '#A8E6CF'
+  final String category;  // '马卡龙'，后续可加 '极简'、'莫兰迪'
+}
+```
+
+- `AppColors.presetThemes` 是唯一数据源，`AppColors.presetsByCategory` 按分类分组；
+- 设置页「预设色板」按分类渲染，新分类 / 新颜色只加数据，不改 UI；
+- 颜色只作为 `ColorScheme.fromSeed` 的 seed，页面背景始终固定米白 `#FAF7F0`。
+
+## App 图标
+
+- 设计源：`assets/icon/cup_memo_icon.svg`（1024×1024，米白底、`#3A3A3A`
+  等宽圆角线框、单缕热气、杯身浅灰填充 + 三层极淡椭圆投影）。
+- 生成物：`assets/icon/cup_memo_icon.png`（传统图标）、`cup_memo_foreground.png`
+  （自适应前景）、`cup_memo_monochrome.png`（Android 13 主题图标）。
+- 配置在 `pubspec.yaml` 的 `flutter_launcher_icons` 段，重新生成：
+
+  ```bash
+  flutter pub run flutter_launcher_icons
+  ```
+
+  会写入 `mipmap-*dpi/ic_launcher.png`、`mipmap-anydpi-v26/ic_launcher.xml`
+  （自适应：背景 `@color/ic_launcher_background` = `#FAF7F0`、前景 inset 16%、
+  monochrome）与 `values/colors.xml`。
+- 说明：本机没有可用的 SVG 光栅化器，PNG 由与本 SVG 几何一致的脚本按 4× 超采样
+  烘焙，避免 SVG `filter`/`gradient` 在转 PNG 时丢失——阴影用三层半透明椭圆实现，
+  不依赖滤镜。
+
+## 条目与索引（EntryDao）
+
+- 写入前先对 `title/body/tags/category` 做 `tokenizeForFts` bigram 预处理，然后
+  **同一事务内**写 `entries` 与 `entries_fts`（`entries_fts.rowid = entries.rowid`）。
+- 更新：先 `DELETE` 旧 FTS 行再插入新行，保证 token 流与内容一致；删除：先删 FTS
+  行再删主表行。
+- 去重：`content_hash = sha256(json[title, body, category, tags])`，命中已有行时
+  返回 `EntryWriteOutcome.duplicate` 与已存在条目的 id，不产生重复数据。
+- 正文落盘：`EntryService` 用 `atomic_file` 写入 `<support>/entries/<id>.md`，文件名
+  与 `entries.md_path` 一致；DB 写入失败时回滚已写文件。
+- 检索：`EntryDao.search()` 对查询词做同样的 bigram 预处理后 `MATCH`，供后续
+  搜索页与 `SearchRegistry` 复用。
+- UI：备忘录页支持新建 / 编辑 / 删除、分类筛选（全部 + 各分类）、标签展示。
+
 ## 开源许可证说明
 
 - 本项目代码：**MIT**，见 [`LICENSE`](LICENSE)（版权年份与作者为占位符
@@ -292,12 +348,13 @@ flutter test
 
 ## 已知限制与 TODO
 
-1. **业务逻辑未实现**：条目 CRUD、Markdown 落盘、FTS5 查询、任务流转、会话归档。
+1. **其余业务逻辑未实现**：任务流转、会话归档、AI 调用；搜索页 UI 仍为占位
+   （`EntryDao.search` 已可用，待接入 SearchRegistry 与搜索页）。
 2. **AI 调用未实现**：`StubProviderClient.sendMessage` 抛 `UnimplementedError`；
    五种 `ProviderKind` 的请求 / 流式解析都待实现。
 3. **搜索无具体实现**：`SearchRegistry` 为空，`search()` 返回空列表。
-4. **`entries_fts` 未接触发器**：FTS 行与 `entries` 的同步（含 bigram 预处理的
-   `INSERT`/`UPDATE`/`DELETE` 触发器）属于下一阶段。
+4. **`entries_fts` 由 DAO 手动同步**（未使用触发器）：所有写入都必须经过
+   `EntryDao`，绕过它直接写 `entries` 表的 SQL 不会自动更新索引。
 5. **依赖版本被有意钉住**（`dependency_overrides`）：
    - `sqlite3 ^2.9.4` + `sqlite3_flutter_libs ^0.5.39`：`sqlite3` 3.x 依赖 Dart native
      assets，而当前工具链的 Android 目标尚不支持；2.x + 0.5.x 由 AAR 内置带 FTS5 的

@@ -61,8 +61,8 @@ class ThemeController extends Notifier<ThemeState> {
   /// Restores the default off-white (米白) seed.
   Future<bool> resetToDefault() => setColor(AppColors.defaultSeedHex);
 
-  /// Applies one of the macaron presets.
-  Future<bool> setPreset(MacaronColor preset) => setColor(preset.hex);
+  /// Applies one of the categorised preset themes.
+  Future<bool> setPreset(PresetTheme preset) => setColor(preset.hex);
 }
 
 /// The single source of truth for the active seed colour.
