@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
@@ -43,11 +44,15 @@ class CupMemoApp extends ConsumerWidget {
         brightness: Brightness.dark,
         backgroundColor: theme.backgroundHex == null ? const Color(0xFF121212) : AppColors.tryParseHex(theme.backgroundHex!),
       ),
-      themeMode: theme.brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
+      themeMode: theme.systemMode ? ThemeMode.system : (theme.brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light),
       builder: (BuildContext context, Widget? child) {
         return AnnotatedRegion<SystemUiOverlayStyle>(
           value: appOverlayStyle,
-          child: child ?? const SizedBox.shrink(),
+          child: GlassAdaptiveScope(
+            minQuality: theme.glassEnabled ? GlassQuality.minimal : GlassQuality.minimal,
+            maxQuality: theme.glassEnabled ? GlassQuality.standard : GlassQuality.minimal,
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
       },
       home: const HomeShell(),

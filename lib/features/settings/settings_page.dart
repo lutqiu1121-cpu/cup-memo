@@ -14,6 +14,8 @@ import 'about_licenses_page.dart';
 import 'github_settings_page.dart';
 
 /// Tab 5 — settings: theme (fully implemented) + provider management entry.
+enum ThemeModeChoice { system, light, dark }
+
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
 
@@ -176,6 +178,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
           ),
           const SizedBox(height: 20),
+          _SectionLabel(text: '界面材质与模式'),
+          const SizedBox(height: 8),
+          Card(child: Column(children: <Widget>[
+            ListTile(leading: const Icon(Icons.brightness_6_outlined), title: const Text('深色模式'), subtitle: Text(themeState.systemMode ? '跟随系统' : (themeState.brightness == Brightness.dark ? '深色' : '浅色')), trailing: DropdownButton<ThemeModeChoice>(value: themeState.systemMode ? ThemeModeChoice.system : (themeState.brightness == Brightness.dark ? ThemeModeChoice.dark : ThemeModeChoice.light), underline: const SizedBox.shrink(), items: const <DropdownMenuItem<ThemeModeChoice>>[
+              DropdownMenuItem(value: ThemeModeChoice.system, child: Text('系统')),
+              DropdownMenuItem(value: ThemeModeChoice.light, child: Text('浅色')),
+              DropdownMenuItem(value: ThemeModeChoice.dark, child: Text('深色')),
+            ], onChanged: (ThemeModeChoice? value) { if (value != null) ref.read(themeControllerProvider.notifier).setBrightness(value == ThemeModeChoice.dark ? Brightness.dark : Brightness.light, system: value == ThemeModeChoice.system); })),
+            SwitchListTile(contentPadding: const EdgeInsets.symmetric(horizontal: 16), title: const Text('界面材质（液态玻璃）'), subtitle: const Text('开启后在支持设备上使用自适应毛玻璃效果'), value: themeState.glassEnabled, onChanged: (bool value) => ref.read(themeControllerProvider.notifier).setGlassEnabled(value)),
+          ])),
+          const SizedBox(height: 20),
           _SectionLabel(text: 'AI 与 Provider'),
           const SizedBox(height: 8),
           Card(
@@ -213,7 +226,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             child: ListTile(
               leading: const Icon(Icons.inventory_2_outlined),
               title: const Text('归档'),
-              subtitle: const Text('已归档的会话（待实现）'),
+              subtitle: const Text('查看已生成的 Markdown 会话归档'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
@@ -231,7 +244,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 const ListTile(
                   leading: Icon(Icons.local_cafe_outlined),
                   title: Text('Cup Memo'),
-                  subtitle: Text('版本 0.1.0 · 框架版本（业务逻辑待实现）'),
+                  subtitle: Text('版本 0.1.0 · AGPL-3.0'),
                 ),
                 const Divider(height: 1),
                 ListTile(

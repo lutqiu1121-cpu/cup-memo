@@ -63,9 +63,11 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
       _thinkingLevel = existing.modelParameters['thinking_level']?.toString() ?? 'medium';
       _thinkingBudget = (existing.modelParameters['thinking_budget'] as num?)?.toDouble() ?? 4096;
       _preset = ProviderPresets.all.firstWhere(
-        (ProviderPreset preset) => preset.kind == existing.kind,
+        (ProviderPreset preset) => preset.kind == existing.kind &&
+            preset.baseUrl == existing.baseUrl,
         orElse: () => ProviderPresets.custom,
       );
+      _capabilities = ModelCapabilitiesRegistry.forModel(existing.defaultModel);
     }
   }
 
@@ -330,8 +332,9 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
             Text('Temperature：${_temperature.toStringAsFixed(1)}'),
             Slider(value: _temperature, min: 0, max: 2, divisions: 20, onChanged: (double value) => setState(() => _temperature = value)),
             TextField(controller: TextEditingController(text: _maxTokens.toString()), keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Max Tokens'), onSubmitted: (String value) { final parsed = int.tryParse(value); if (parsed != null) setState(() => _maxTokens = parsed.clamp(1, _capabilities.maxContextTokens)); }),
-            if (_capabilities.supportsThinking)
-              SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('开启思考模式'), value: _thinking, onChanged: (bool value) => setState(() => _thinking = value)),
+            Text('最大上下文：${_capabilities.maxContextTokens} tokens'),
+            Slider(value: _capabilities.maxContextTokens.toDouble().clamp(1024, 1000000), min: 1024, max: 1000000, divisions: 100, onChanged: (double value) => setState(() => _capabilities = _capabilities.copyWith(maxContextTokens: value.toInt()))),
+            SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('开启深度思考'), subtitle: Text(_capabilities.supportsThinking ? '当前模型支持' : '当前模型不支持'), value: _thinking, onChanged: _capabilities.supportsThinking ? (bool value) => setState(() => _thinking = value) : null),
             if (_thinking && _capabilities.supportsThinkingLevels)
               DropdownButtonFormField<String>(initialValue: _capabilities.thinkingLevels.contains(_thinkingLevel) ? _thinkingLevel : _capabilities.thinkingLevels.first, decoration: const InputDecoration(labelText: '思考等级'), items: _capabilities.thinkingLevels.map((String value) => DropdownMenuItem<String>(value: value, child: Text(value))).toList(), onChanged: (String? value) { if (value != null) setState(() => _thinkingLevel = value); }),
             if (_thinking && _capabilities.supportsThinkingBudget) ...<Widget>[
