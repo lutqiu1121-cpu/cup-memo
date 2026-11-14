@@ -45,14 +45,18 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
 
+# The final artwork is a full-bleed 2048x2048 render, so it becomes the
+# adaptive **background** layer (no seams, no square edge on round masks) and
+# the foreground layer stays transparent. Legacy launchers get the same art
+# through `image_path`.
 flutter_launcher_icons:
   android: true
   ios: false
-  image_path: assets/icon/cup_memo_icon.png
+  image_path: assets/icon/app_icon.png
   min_sdk_android: 23
-  adaptive_icon_background: '#FAF7F0'
-  adaptive_icon_foreground: assets/icon/cup_memo_foreground.png
-  adaptive_icon_monochrome: assets/icon/cup_memo_monochrome.png
+  adaptive_icon_background: assets/icon/app_icon.png
+  adaptive_icon_foreground: assets/icon/app_icon_foreground.png
+  adaptive_icon_foreground_inset: 0
 
 # The iOS/macOS implementations of path_provider and shared_preferences only
 # matter for the Android build as far as pub resolution goes; the newest ones

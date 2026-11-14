@@ -4,8 +4,8 @@
 
 > **当前阶段：可编译的 APK 框架（Framework Skeleton）**
 > 本阶段只交付“跑得起来的骨架”：页面结构、主题系统、多 Provider 配置与管理、
-> 数据库建表、服务层接口与 stub。条目 CRUD、搜索实现、AI 真实调用、归档逻辑
-> 均**未实现**，按钮会弹出「该板块待实现」的提示。
+> 数据库、条目 CRUD、FTS5 索引、模糊搜索与任务状态管理已接入；AI 真实调用与归档
+> 仍是 stub，未实现部分按钮会弹出「该板块待实现」的提示。
 
 ---
 
@@ -39,9 +39,10 @@
 | `cjk_tokenizer` bigram 预处理 | ✅ | 中英混排，写入 / 查询复用同一函数 |
 | 条目 CRUD / Markdown 落盘 / 分类筛选 | ✅ | `EntryDao` 手写 SQL，正文原子写入 `entries/<id>.md` |
 | 条目全文索引（FTS5 + bigram 同步） | ✅ | 写/改/删同步维护 `entries_fts`，`content_hash` 去重 |
-| 搜索（FTS5 查询、SearchRegistry 实现） | ⛔ | 后续阶段，接口与 registry 已就位 |
+| 搜索页（300ms 防抖、FTS5、高亮、历史） | ✅ | 搜索结果可跳转编辑，历史最多 20 条 |
+| 任务状态管理 | ✅ | 当前 / 历史双 Tab，完成后支持撤销 |
 | AI 真实调用（ProviderRouter 客户端） | ⛔ | `sendMessage` 抛 `UnimplementedError` |
-| 任务 / 归档业务逻辑 | ⛔ | 后续阶段，`ArchiveService.archiveSession` 返回 `null` |
+| 会话归档业务逻辑 | ⛔ | `ArchiveService.archiveSession` 返回 `null` |
 
 ## 技术栈
 
@@ -74,6 +75,7 @@ lib/
       schema.dart               # 全部建表 SQL（含 entries_fts）
       dao/provider_dao.dart     # 手写 DAO：providers 表 CRUD
       dao/entry_dao.dart        # 手写 DAO：entries + entries_fts 同步、去重、检索
+      dao/task_dao.dart         # current_tasks/history_tasks 移动与撤销
     utils/
       cjk_tokenizer.dart        # 中文 bigram 预处理（写入/查询共用）
       atomic_file.dart          # 临时文件 + rename 的原子写入
@@ -83,9 +85,9 @@ lib/
   features/
     archive/archive_page.dart     # 归档占位页（设置 → 归档）
     entries/entries_page.dart     # 备忘录列表 + 新建/编辑页（EntryEditPage）
-    search/search_page.dart
+    search/search_page.dart     # 防抖搜索 + 高亮 + 历史
     chat/chat_page.dart
-    tasks/tasks_page.dart
+    tasks/tasks_page.dart       # 当前 / 历史双 Tab + 撤销
     settings/
       settings_page.dart
       provider_management_page.dart
@@ -307,10 +309,9 @@ class PresetTheme {
 
 ## App 图标
 
-- 设计源：`assets/icon/cup_memo_icon.svg`（1024×1024，米白底、`#3A3A3A`
-  等宽圆角线框、单缕热气、杯身浅灰填充 + 三层极淡椭圆投影）。
-- 生成物：`assets/icon/cup_memo_icon.png`（传统图标）、`cup_memo_foreground.png`
-  （自适应前景）、`cup_memo_monochrome.png`（Android 13 主题图标）。
+- 最终源图：`assets/icon/app_icon.png`（用户提供的 2048×2048 微拟物咖啡杯图标）。
+- 配置：`image_path` 指向 `assets/icon/app_icon.png`；同一源图作为 adaptive background，
+  透明前景层负责 Android 13 自适应结构，避免背景方块接缝。
 - 配置在 `pubspec.yaml` 的 `flutter_launcher_icons` 段，重新生成：
 
   ```bash
@@ -348,8 +349,8 @@ class PresetTheme {
 
 ## 已知限制与 TODO
 
-1. **其余业务逻辑未实现**：任务流转、会话归档、AI 调用；搜索页 UI 仍为占位
-   （`EntryDao.search` 已可用，待接入 SearchRegistry 与搜索页）。
+1. **其余业务逻辑未实现**：会话归档、AI 调用；搜索页当前直接走 `EntryService`，
+   后续可再接入 `SearchRegistry` 的多后端 fallback。
 2. **AI 调用未实现**：`StubProviderClient.sendMessage` 抛 `UnimplementedError`；
    五种 `ProviderKind` 的请求 / 流式解析都待实现。
 3. **搜索无具体实现**：`SearchRegistry` 为空，`search()` 返回空列表。

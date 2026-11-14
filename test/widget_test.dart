@@ -84,16 +84,16 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // The "任务" tab is still a placeholder at this stage.
+    // Chat is still a static layout: sending shows the placeholder snack bar.
     await tester.tap(
       find.descendant(
         of: find.byType(NavigationBar),
-        matching: find.text('任务'),
+        matching: find.text('会话'),
       ),
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('新建任务').first);
+    await tester.tap(find.byTooltip('发送'));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('该板块待实现'), findsOneWidget);

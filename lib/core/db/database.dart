@@ -7,6 +7,7 @@ import 'package:sqlite3/sqlite3.dart';
 
 import 'dao/entry_dao.dart';
 import 'dao/provider_dao.dart';
+import 'dao/task_dao.dart';
 import 'schema.dart';
 
 /// Thin hand-written wrapper around a [Database] connection.
@@ -16,7 +17,8 @@ import 'schema.dart';
 class AppDatabase {
   AppDatabase._(this._db, this.storageDirectory)
       : providerDao = ProviderDao(_db),
-        entryDao = EntryDao(_db);
+        entryDao = EntryDao(_db),
+        taskDao = TaskDao(_db);
 
   final Database _db;
 
@@ -26,6 +28,7 @@ class AppDatabase {
   /// Hand-written DAOs.
   final ProviderDao providerDao;
   final EntryDao entryDao;
+  final TaskDao taskDao;
 
   /// Escape hatch for future DAOs / tests.
   Database get raw => _db;
