@@ -18,6 +18,7 @@ class Entry {
     required this.createdAt,
     required this.updatedAt,
     this.taskStatus = 'none',
+    this.isAiContext = false,
   });
 
   final String id;
@@ -32,6 +33,7 @@ class Entry {
 
   /// One of `none`, `open`, `done`.
   final String taskStatus;
+  final bool isAiContext;
 
   /// Comma separated tag list, as stored in the `tags` column.
   String get tagsAsText => tags.join(',');
@@ -48,6 +50,7 @@ class Entry {
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'task_status': taskStatus,
+      'is_ai_context': isAiContext ? 1 : 0,
     };
   }
 
@@ -63,6 +66,7 @@ class Entry {
       createdAt: _parseDate(row['created_at']) ?? DateTime.now(),
       updatedAt: _parseDate(row['updated_at']) ?? DateTime.now(),
       taskStatus: row['task_status'] as String? ?? 'none',
+      isAiContext: ((row['is_ai_context'] as int?) ?? 0) != 0,
     );
   }
 
@@ -75,6 +79,7 @@ class Entry {
     String? sessionId,
     DateTime? updatedAt,
     String? taskStatus,
+    bool? isAiContext,
   }) {
     return Entry(
       id: id,
@@ -87,6 +92,7 @@ class Entry {
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       taskStatus: taskStatus ?? this.taskStatus,
+      isAiContext: isAiContext ?? this.isAiContext,
     );
   }
 

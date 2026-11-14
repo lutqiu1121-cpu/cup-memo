@@ -6,8 +6,8 @@
 
 > **当前阶段：可编译的 APK 框架（Framework Skeleton）**
 > 本阶段只交付“跑得起来的骨架”：页面结构、主题系统、多 Provider 配置与管理、
-> 数据库、条目 CRUD、FTS5 索引、模糊搜索与任务状态管理已接入；AI 真实调用与归档
-> 仍是 stub，未实现部分按钮会弹出「该板块待实现」的提示。
+> 数据库、条目 CRUD、FTS5 索引、模糊搜索、任务状态管理与真实 Agent 流式对话已接入；
+> 会话归档仍是 stub，未实现部分按钮会弹出「该板块待实现」的提示。
 
 ---
 
@@ -43,7 +43,7 @@
 | 条目全文索引（FTS5 + bigram 同步） | ✅ | 写/改/删同步维护 `entries_fts`，`content_hash` 去重 |
 | 搜索页（300ms 防抖、FTS5、高亮、历史） | ✅ | 搜索结果可跳转编辑，历史最多 20 条 |
 | 任务状态管理 | ✅ | 当前 / 历史双 Tab，完成后支持撤销 |
-| AI 真实调用（ProviderRouter 客户端） | ⛔ | `sendMessage` 抛 `UnimplementedError` |
+| AI 真实调用（dart_agent_core Agent） | ✅ | OpenAI-compatible 流式响应、工具循环、动态记忆 |
 | 会话归档业务逻辑 | ⛔ | `ArchiveService.archiveSession` 返回 `null` |
 
 ## 技术栈
@@ -92,13 +92,14 @@ lib/
     tasks/tasks_page.dart       # 当前 / 历史双 Tab + 撤销
     settings/
       settings_page.dart
+      about_licenses_page.dart
       provider_management_page.dart
       provider_form_page.dart
   services/
     provider/
       provider_config.dart      # ProviderConfig 模型 + ProviderKind
       provider_presets.dart     # 5 个内置预设
-      provider_router.dart      # ProviderRouter + StubProviderClient
+      provider_router.dart      # OpenAIClient + StatefulAgent + tools + stream
       api_key_store.dart        # flutter_secure_storage 封装
     search/
       search_provider.dart      # SearchProvider 接口
@@ -139,7 +140,9 @@ UI (features/*)  ──ref.watch/read──▶  providers/app_providers.dart
 - **密钥边界**：`providers` 表只存 `api_key_ref`；真实 Key 写入
   `flutter_secure_storage`（`cup_memo.provider.api_key.<ref>`），永不落库、永不进日志。
 - **会话隔离**：`currentProviderIdProvider` 只影响“后续消息”，`ProviderRouter` 由当前
-  Provider 构造，历史消息模型与 Provider 无关。
+  Provider 与安全存储中的 API Key 构造，历史消息模型与 Provider 无关。
+- **Agent 工具与记忆**：每次发送前读取 `is_ai_context=1` 的条目，拼入 system prompt；
+  `search_entries` 与 `create_entry` 作为 `Tool` 注册给 `StatefulAgent`，库内部处理工具循环。
 
 ## 环境要求
 
@@ -185,8 +188,8 @@ flutter analyze
 > API Key 保存位置：`flutter_secure_storage`（Android Keystore）。
 > 数据库 `providers.api_key_ref` 只保存一个随机引用 id。删除 Provider 时会一并删除 Key。
 >
-> 本阶段不会发起任何真实 API 请求；`ProviderRouter.createClient()` 返回
-> `StubProviderClient`，`sendMessage` 抛 `UnimplementedError`。
+> 当前真实请求使用 `dart_agent_core 2.1.9` 的 `OpenAIClient` 与 `StatefulAgent`。
+> Provider kind 为非 OpenAI-compatible 时，需要确认其网关提供 OpenAI-compatible `/chat/completions` 接口。
 
 ## 如何构建 APK
 
@@ -351,13 +354,24 @@ class PresetTheme {
 - 运行时的完整许可证列表可在设备上通过 **设置 → 关于 → 开源许可** 查看
   （Flutter 的 `showLicensePage` 自动汇总）。
 
+## AGPL-3.0 分发合规说明
+
+Cup Memo 自有代码采用 GNU AGPL-3.0。发布 APK、AAB 或其他可下载构建物时：
+
+1. Release 页面必须附上对应源码 commit、源码压缩包或源码仓库链接；
+2. 必须保留根目录 `LICENSE`、`THIRD_PARTY_NOTICES.md` 及第三方版权/许可证声明；
+3. 网络服务场景要向远程交互用户提供运行版本对应的源代码获取方式，见 AGPL-3.0 第 13 条；
+4. 不要把 MIT/BSD/Apache/SQLite 等第三方组件误标成 AGPL，它们仍按原许可证分发；
+5. 发布前按 [`RELEASE_GUIDE.md`](RELEASE_GUIDE.md) 完成源码、artifact、签名和素材授权检查；
+6. 安全问题请按 [`.github/SECURITY.md`](.github/SECURITY.md) 私下报告，不要把 API Key 或 keystore 放进 issue/CI 日志。
+
 ## 已知限制与 TODO
 
-1. **其余业务逻辑未实现**：会话归档、AI 调用；搜索页当前直接走 `EntryService`，
-   后续可再接入 `SearchRegistry` 的多后端 fallback。
-2. **AI 调用未实现**：`StubProviderClient.sendMessage` 抛 `UnimplementedError`；
-   五种 `ProviderKind` 的请求 / 流式解析都待实现。
-3. **搜索无具体实现**：`SearchRegistry` 为空，`search()` 返回空列表。
+1. **其余业务逻辑未实现**：会话归档；搜索页当前直接走 `EntryService`，后续可再接入
+   `SearchRegistry` 的多后端 fallback。
+2. **Provider 协议差异**：当前 Agent 使用 OpenAI-compatible `OpenAIClient`；Anthropic/Gemini
+   原生协议适配仍待实现，需使用兼容网关或后续新增专用 client。
+3. **SearchRegistry 尚未注册远程/向量后端**：搜索页当前使用本地 `EntryDao` FTS5。
 4. **`entries_fts` 由 DAO 手动同步**（未使用触发器）：所有写入都必须经过
    `EntryDao`，绕过它直接写 `entries` 表的 SQL 不会自动更新索引。
 5. **依赖版本被有意钉住**（`dependency_overrides`）：

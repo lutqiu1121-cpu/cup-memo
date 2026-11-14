@@ -8,6 +8,7 @@ import '../../providers/app_providers.dart';
 import '../../services/provider/provider_config.dart';
 import '../archive/archive_page.dart';
 import 'provider_management_page.dart';
+import 'about_licenses_page.dart';
 
 /// Tab 5 — settings: theme (fully implemented) + provider management entry.
 class SettingsPage extends ConsumerStatefulWidget {
@@ -219,8 +220,22 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ),
                 const Divider(height: 1),
                 ListTile(
-                  leading: const Icon(Icons.description_outlined),
-                  title: const Text('开源许可'),
+                  leading: const Icon(Icons.verified_outlined),
+                  title: const Text('开源许可与关于'),
+                  subtitle: const Text('AGPL-3.0 · Cup Memo 0.1.0 · GitHub'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (BuildContext context) =>
+                          const AboutLicensesPage(),
+                    ),
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.library_books_outlined),
+                  title: const Text('Flutter 系统许可证'),
+                  subtitle: const Text('查看 Flutter 自动汇总的第三方许可证'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => showLicensePage(
                     context: context,

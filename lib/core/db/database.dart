@@ -88,11 +88,11 @@ class AppDatabase {
   /// / `CREATE TABLE` statements here (one `if (oldVersion < n)` block per
   /// version) and keep this comment in sync with [Schema.version].
   static void onUpgrade(Database db, int oldVersion, int newVersion) {
-    // Intentionally left empty for schema version 1.
-    //
-    // TODO(db): when [Schema.version] becomes 2, add
-    //   if (oldVersion < 2) { db.execute('ALTER TABLE ...'); }
-    // and keep every step idempotent so an interrupted upgrade can be retried.
+    if (oldVersion < 2) {
+      db.execute(
+        'ALTER TABLE entries ADD COLUMN is_ai_context INTEGER DEFAULT 0',
+      );
+    }
   }
 
   /// Closes the underlying connection. Safe to call once.

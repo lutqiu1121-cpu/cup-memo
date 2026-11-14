@@ -30,7 +30,7 @@ class EntryDao {
         : ' WHERE category = ?';
     final ResultSet rows = _db.select(
       'SELECT id, title, category, tags, md_path, content_hash, session_id, '
-      'created_at, updated_at, task_status FROM entries$where '
+      'created_at, updated_at, task_status, is_ai_context FROM entries$where '
       'ORDER BY updated_at DESC',
       category == null || category.isEmpty ? const <Object?>[] : <Object?>[category],
     );
@@ -51,7 +51,7 @@ class EntryDao {
   Entry? findById(String id) {
     final ResultSet rows = _db.select(
       'SELECT id, title, category, tags, md_path, content_hash, session_id, '
-      'created_at, updated_at, task_status FROM entries WHERE id = ?',
+      'created_at, updated_at, task_status, is_ai_context FROM entries WHERE id = ?',
       <Object?>[id],
     );
     return rows.isEmpty ? null : Entry.fromRow(rows.first);
@@ -64,6 +64,7 @@ class EntryDao {
     List<String> tags = const <String>[],
     String mdPath = '',
     String? sessionId,
+    bool isAiContext = false,
     String? id,
     DateTime? now,
   }) {
@@ -90,7 +91,7 @@ class EntryDao {
     _db.execute(
       'INSERT INTO entries '
       '(id, title, category, tags, md_path, content_hash, session_id, '
-      'created_at, updated_at, task_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'created_at, updated_at, task_status, is_ai_context) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       <Object?>[
         entryId,
         title.trim(),
@@ -102,6 +103,7 @@ class EntryDao {
         timestamp.toIso8601String(),
         timestamp.toIso8601String(),
         'none',
+        isAiContext ? 1 : 0,
       ],
     );
     _writeFts(
@@ -123,6 +125,7 @@ class EntryDao {
     required String title,
     String category = '',
     List<String> tags = const <String>[],
+    bool? isAiContext,
     String? mdPath,
     DateTime? now,
   }) {
@@ -162,7 +165,8 @@ class EntryDao {
     final String updatedAt = (now ?? DateTime.now()).toIso8601String();
     _db.execute(
       'UPDATE entries SET title = ?, category = ?, tags = ?, '
-      'md_path = COALESCE(?, md_path), content_hash = ?, updated_at = ? '
+      'md_path = COALESCE(?, md_path), content_hash = ?, updated_at = ?, '
+      'is_ai_context = COALESCE(?, is_ai_context) '
       'WHERE id = ?',
       <Object?>[
         title.trim(),
@@ -171,6 +175,7 @@ class EntryDao {
         mdPath,
         hash,
         updatedAt,
+        isAiContext == null ? null : (isAiContext ? 1 : 0),
         id,
       ],
     );
@@ -203,7 +208,7 @@ class EntryDao {
     if (tokenized.isEmpty) return const <Entry>[];
     final ResultSet rows = _db.select(
       'SELECT e.id, e.title, e.category, e.tags, e.md_path, e.content_hash, '
-      'e.session_id, e.created_at, e.updated_at, e.task_status '
+      'e.session_id, e.created_at, e.updated_at, e.task_status, e.is_ai_context '
       'FROM entries e JOIN entries_fts f ON f.rowid = e.rowid '
       'WHERE entries_fts MATCH ? ORDER BY e.updated_at DESC LIMIT ?',
       <Object?>[tokenized, limit],

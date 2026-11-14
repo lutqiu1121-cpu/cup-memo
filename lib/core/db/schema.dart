@@ -7,7 +7,7 @@ class Schema {
   const Schema._();
 
   /// Current database version, mirrored into `PRAGMA user_version`.
-  static const int version = 1;
+  static const int version = 2;
 
   /// File name of the database inside the application support directory.
   static const String databaseFileName = 'cup_memo.db';
@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS entries (
   session_id TEXT,
   created_at TEXT,
   updated_at TEXT,
-  task_status TEXT DEFAULT 'none'
+  task_status TEXT DEFAULT 'none',
+  is_ai_context INTEGER DEFAULT 0
 )
 ''';
 

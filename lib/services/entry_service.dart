@@ -23,6 +23,11 @@ class EntryService {
 
   Future<List<Entry>> search(String query) async => database.entryDao.search(query);
 
+  Future<List<Entry>> aiContextEntries() async {
+    final entries = await list();
+    return entries.where((Entry entry) => entry.isAiContext).toList(growable: false);
+  }
+
   Future<String> readBody(Entry entry) async {
     if (entry.mdPath.isEmpty) return '';
     return (await readStringIfExists(entry.mdPath)) ?? '';
@@ -34,6 +39,7 @@ class EntryService {
     required String category,
     required List<String> tags,
     String? sessionId,
+    bool isAiContext = false,
   }) async {
     final String id = newEntryId();
     final String path = '${_entriesDirectory.path}/$id.md';
@@ -45,6 +51,7 @@ class EntryService {
       tags: tags,
       mdPath: path,
       sessionId: sessionId,
+      isAiContext: isAiContext,
     );
     if (result.outcome == EntryWriteOutcome.inserted) {
       try {
@@ -63,6 +70,7 @@ class EntryService {
     required String body,
     required String category,
     required List<String> tags,
+    bool? isAiContext,
   }) async {
     final String path = entry.mdPath.isEmpty
         ? '${_entriesDirectory.path}/${entry.id}.md'
@@ -73,6 +81,7 @@ class EntryService {
       body: body,
       category: category,
       tags: tags,
+      isAiContext: isAiContext,
       mdPath: path,
     );
     if (result.outcome != EntryWriteOutcome.duplicate) {

@@ -220,9 +220,11 @@ final Provider<ProviderConfig?> activeProviderProvider =
   return selected ?? list.defaultProvider;
 });
 
-/// Router bound to the active provider (`null` when nothing is configured).
-final Provider<ProviderRouter?> providerRouterProvider =
-    Provider<ProviderRouter?>((Ref ref) {
+/// Router bound to the active provider and its securely stored API key.
+final FutureProvider<ProviderRouter?> providerRouterProvider =
+    FutureProvider<ProviderRouter?>((Ref ref) async {
   final ProviderConfig? active = ref.watch(activeProviderProvider);
-  return active == null ? null : ProviderRouter(active);
+  if (active == null) return null;
+  final String? apiKey = await ref.read(apiKeyStoreProvider).read(active.apiKeyRef);
+  return ProviderRouter(active, apiKey: apiKey);
 });
