@@ -16,7 +16,9 @@ import '../../services/entry_service.dart';
 import '../../services/provider/provider_config.dart';
 import '../../services/provider/model_capabilities.dart';
 import '../../services/provider/provider_router.dart';
+import '../../services/github_service.dart';
 import 'package:dartantic_ai/dartantic_ai.dart' as da;
+import 'package:flutter/services.dart';
 
 import '../settings/provider_management_page.dart';
 
@@ -166,6 +168,16 @@ class ChatPageState extends ConsumerState<ChatPage> {
         name: 'complete_task', description: 'Complete a task by id.',
         inputSchema: da.Schema.fromMap({'type': 'object', 'properties': {'task_id': {'type': 'string'}}, 'required': ['task_id']}),
         onCall: (Map<String, dynamic> args) => ref.read(databaseProvider)?.taskDao.completeTask(args['task_id']?.toString() ?? '') ?? false,
+      ),
+      da.Tool<Map<String, dynamic>>(
+        name: 'fetch_github_file', description: 'Read a file from GitHub using the configured secure token.',
+        inputSchema: da.Schema.fromMap({'type': 'object', 'properties': {'owner': {'type': 'string'}, 'repo': {'type': 'string'}, 'path': {'type': 'string'}, 'ref': {'type': 'string'}}, 'required': ['owner', 'repo', 'path']}),
+        onCall: (Map<String, dynamic> args) => GitHubService().fetchFile(owner: args['owner'].toString(), repo: args['repo'].toString(), path: args['path'].toString(), ref: args['ref']?.toString() ?? 'main'),
+      ),
+      da.Tool<Map<String, dynamic>>(
+        name: 'commit_github_file', description: 'Commit a file to GitHub using the configured secure token.',
+        inputSchema: da.Schema.fromMap({'type': 'object', 'properties': {'owner': {'type': 'string'}, 'repo': {'type': 'string'}, 'path': {'type': 'string'}, 'content': {'type': 'string'}, 'message': {'type': 'string'}, 'branch': {'type': 'string'}}, 'required': ['owner', 'repo', 'path', 'content', 'message']}),
+        onCall: (Map<String, dynamic> args) async { await GitHubService().commitFile(owner: args['owner'].toString(), repo: args['repo'].toString(), path: args['path'].toString(), content: args['content'].toString(), message: args['message'].toString(), branch: args['branch']?.toString() ?? 'main'); return 'GitHub commit completed'; },
       ),
       da.Tool<Map<String, dynamic>>(
         name: 'list_tasks', description: 'List current and recently completed tasks.',
@@ -497,7 +509,7 @@ class _Bubble extends StatelessWidget {
                   Text(reasoning!, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                 ],
               ),
-            Text(message.content.isEmpty ? '…' : message.content),
+            Row(crossAxisAlignment: CrossAxisAlignment.end, children: <Widget>[Expanded(child: Text(message.content.isEmpty ? '…' : message.content)), IconButton(tooltip: '复制', icon: const Icon(Icons.copy_outlined, size: 16), onPressed: () => Clipboard.setData(ClipboardData(text: message.content))) ]),
           ],
         ),
       ),

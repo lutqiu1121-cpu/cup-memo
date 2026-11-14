@@ -425,8 +425,8 @@ class _EntryPreviewPageState extends ConsumerState<EntryPreviewPage> {
                   data: _body.isEmpty ? '_（正文为空）_' : _body,
                   selectable: true,
                   styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-                    codeblockDecoration: BoxDecoration(color: const Color(0xFFF3F0EA), borderRadius: BorderRadius.circular(12)),
-                    code: const TextStyle(fontFamily: 'monospace', color: AppColors.textPrimary),
+                    codeblockDecoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(12)),
+                    code: TextStyle(fontFamily: 'monospace', color: Theme.of(context).colorScheme.onSurface),
                   ),
                   builders: <String, MarkdownElementBuilder>{'pre': _CopyableCodeBlockBuilder(context)},
                 ),
@@ -450,7 +450,7 @@ class _CopyableCodeBlockBuilder extends MarkdownElementBuilder {
       width: double.infinity,
       margin: const EdgeInsets.symmetric(vertical: 8),
       padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
-      decoration: BoxDecoration(color: const Color(0xFFF3F0EA), borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(12)),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
