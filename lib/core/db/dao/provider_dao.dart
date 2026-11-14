@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:sqlite3/sqlite3.dart';
 
 import '../../../services/provider/provider_config.dart';
@@ -15,7 +17,7 @@ class ProviderDao {
   List<ProviderConfig> list() {
     final ResultSet rows = _db.select(
       'SELECT id, name, kind, base_url, api_key_ref, default_model, '
-      'extra_headers, is_default FROM providers '
+      'extra_headers, model_parameters, is_default FROM providers '
       'ORDER BY is_default DESC, name COLLATE NOCASE ASC',
     );
     return rows.map(ProviderConfig.fromRow).toList(growable: false);
@@ -24,7 +26,7 @@ class ProviderDao {
   ProviderConfig? findById(String id) {
     final ResultSet rows = _db.select(
       'SELECT id, name, kind, base_url, api_key_ref, default_model, '
-      'extra_headers, is_default FROM providers WHERE id = ?',
+      'extra_headers, model_parameters, is_default FROM providers WHERE id = ?',
       <Object?>[id],
     );
     if (rows.isEmpty) {
@@ -37,8 +39,8 @@ class ProviderDao {
   void upsert(ProviderConfig config) {
     _db.execute(
       'INSERT OR REPLACE INTO providers '
-      '(id, name, kind, base_url, api_key_ref, default_model, extra_headers, is_default) '
-      'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      '(id, name, kind, base_url, api_key_ref, default_model, extra_headers, model_parameters, is_default) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       <Object?>[
         config.id,
         config.name,
@@ -47,6 +49,7 @@ class ProviderDao {
         config.apiKeyRef,
         config.defaultModel,
         config.extraHeadersJson,
+        jsonEncode(config.modelParameters),
         config.isDefault ? 1 : 0,
       ],
     );
@@ -70,7 +73,7 @@ class ProviderDao {
   ProviderConfig? get defaultProvider {
     final ResultSet rows = _db.select(
       'SELECT id, name, kind, base_url, api_key_ref, default_model, '
-      'extra_headers, is_default FROM providers WHERE is_default = 1 LIMIT 1',
+      'extra_headers, model_parameters, is_default FROM providers WHERE is_default = 1 LIMIT 1',
     );
     if (rows.isEmpty) {
       return null;

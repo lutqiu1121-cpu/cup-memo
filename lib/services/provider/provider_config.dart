@@ -41,6 +41,7 @@ class ProviderConfig {
     required this.apiKeyRef,
     required this.defaultModel,
     this.extraHeaders = const <String, String>{},
+    this.modelParameters = const <String, dynamic>{},
     this.isDefault = false,
   });
 
@@ -55,6 +56,9 @@ class ProviderConfig {
 
   /// Additional HTTP headers (e.g. OpenRouter's `HTTP-Referer`).
   final Map<String, String> extraHeaders;
+
+  /// Model-adaptive request parameters (context, temperature, thinking, ...).
+  final Map<String, dynamic> modelParameters;
 
   /// Whether this is the default provider.
   final bool isDefault;
@@ -76,6 +80,7 @@ class ProviderConfig {
       apiKeyRef: row['api_key_ref'] as String? ?? '',
       defaultModel: row['default_model'] as String? ?? '',
       extraHeaders: decodeHeaders(row['extra_headers'] as String?),
+      modelParameters: decodeParameters(row['model_parameters'] as String?),
       isDefault: ((row['is_default'] as int?) ?? 0) != 0,
     );
   }
@@ -89,6 +94,7 @@ class ProviderConfig {
       'api_key_ref': apiKeyRef,
       'default_model': defaultModel,
       'extra_headers': extraHeadersJson,
+      'model_parameters': jsonEncode(modelParameters),
       'is_default': isDefault ? 1 : 0,
     };
   }
@@ -100,6 +106,7 @@ class ProviderConfig {
     String? apiKeyRef,
     String? defaultModel,
     Map<String, String>? extraHeaders,
+    Map<String, dynamic>? modelParameters,
     bool? isDefault,
   }) {
     return ProviderConfig(
@@ -110,6 +117,7 @@ class ProviderConfig {
       apiKeyRef: apiKeyRef ?? this.apiKeyRef,
       defaultModel: defaultModel ?? this.defaultModel,
       extraHeaders: extraHeaders ?? this.extraHeaders,
+      modelParameters: modelParameters ?? this.modelParameters,
       isDefault: isDefault ?? this.isDefault,
     );
   }
@@ -133,6 +141,15 @@ class ProviderConfig {
       // Corrupted / hand-edited value: fall back to "no extra headers".
     }
     return const <String, String>{};
+  }
+
+  static Map<String, dynamic> decodeParameters(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return const <String, dynamic>{};
+    try {
+      final Object? decoded = jsonDecode(raw);
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+    } catch (_) {}
+    return const <String, dynamic>{};
   }
 
   /// Parses a `Key: Value` per line text block into a header map.

@@ -7,7 +7,7 @@ class Schema {
   const Schema._();
 
   /// Current database version, mirrored into `PRAGMA user_version`.
-  static const int version = 2;
+  static const int version = 3;
 
   /// File name of the database inside the application support directory.
   static const String databaseFileName = 'cup_memo.db';
@@ -98,6 +98,7 @@ CREATE TABLE IF NOT EXISTS providers (
   api_key_ref TEXT,
   default_model TEXT,
   extra_headers TEXT,
+  model_parameters TEXT DEFAULT '{}',
   is_default INTEGER DEFAULT 0
 )
 ''';

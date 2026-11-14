@@ -12,6 +12,7 @@ import '../../models/entry.dart';
 import '../../providers/app_providers.dart';
 import '../../services/entry_service.dart';
 import '../../services/provider/provider_config.dart';
+import '../../services/provider/model_capabilities.dart';
 import '../../services/provider/provider_router.dart';
 import '../settings/provider_management_page.dart';
 
@@ -27,7 +28,69 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   final TextEditingController _input = TextEditingController();
   final ScrollController _scroll = ScrollController();
   final List<ChatMessage> _messages = <ChatMessage>[];
+  final Map<String, String> _reasoning = <String, String>{};
+  String? _sessionId;
   bool _sending = false;
+  bool _webSearch = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.microtask(_ensureSession);
+  }
+
+  void _ensureSession() {
+    if (_sessionId != null) return;
+    final db = ref.read(databaseProvider);
+    setState(() => _sessionId = db?.sessionDao.create() ?? newSessionId());
+  }
+
+  Future<void> _newSession() async {
+    final db = ref.read(databaseProvider);
+    if (db != null && _sessionId != null) db.sessionDao.end(_sessionId!);
+    setState(() {
+      _sessionId = db?.sessionDao.create() ?? newSessionId();
+      _messages.clear();
+      _reasoning.clear();
+    });
+  }
+
+  Future<void> _showHistory() async {
+    final db = ref.read(databaseProvider);
+    if (db == null) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('数据库不可用，无法读取历史会话')));
+      return;
+    }
+    var records = db.sessionDao.list();
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext sheetContext) => StatefulBuilder(
+        builder: (BuildContext context, StateSetter setSheetState) => SafeArea(
+          child: SizedBox(
+            height: MediaQuery.sizeOf(context).height * .65,
+            child: records.isEmpty
+                ? const Center(child: Text('暂无历史会话'))
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                    itemCount: records.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (BuildContext context, int index) {
+                      final record = records[index];
+                      return ListTile(
+                        leading: const Icon(Icons.chat_bubble_outline),
+                        title: Text('会话 ${record.id.substring(0, 8)}'),
+                        subtitle: Text(_formatSessionDate(record.startedAt)),
+                        trailing: IconButton(icon: const Icon(Icons.delete_outline), onPressed: () { db.sessionDao.delete(record.id); records = db.sessionDao.list(); setSheetState(() {}); }),
+                        onTap: () { setState(() { _sessionId = record.id; _messages.clear(); _reasoning.clear(); }); Navigator.of(sheetContext).pop(); },
+                      );
+                    },
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   void dispose() {
@@ -36,7 +99,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     super.dispose();
   }
 
-  Future<List<String>> _memoryPrompts() async {
+  Future<List<String>> _memoryPrompts(String query) async {
     final EntryService? service = ref.read(entryServiceProvider);
     if (service == null) return const <String>[];
     final List<Entry> entries = await service.aiContextEntries();
@@ -46,9 +109,18 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       final String body = await service.readBody(entry);
       blocks.add('[${entry.title}]: ${body.trim()}');
     }
-    return <String>[
+    final List<String> prompts = <String>[
       '【以下是用户设定的项目背景，请优先参考，但不要擅自修改】\n${blocks.join('\n')}',
     ];
+    if (_webSearch) {
+      final List<Entry> hits = await service.search(query);
+      final List<String> searchBlocks = <String>[];
+      for (final Entry hit in hits.take(5)) {
+        searchBlocks.add('[本地搜索 ${hit.title}]：${(await service.readBody(hit)).trim()}');
+      }
+      prompts.add('【联网搜索开关已开启】当前无外部搜索 API，优先使用以下本地搜索上下文：\n${searchBlocks.join('\n')}');
+    }
+    return prompts;
   }
 
   List<Tool> _tools() {
@@ -121,7 +193,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     _input.clear();
     final ChatMessage user = ChatMessage(
       id: newMessageId(),
-      sessionId: 'current',
+      sessionId: _sessionId ?? 'current',
       role: ChatRole.user,
       content: text,
       createdAt: DateTime.now(),
@@ -135,7 +207,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       _messages.add(
         ChatMessage(
           id: assistantId,
-          sessionId: 'current',
+          sessionId: _sessionId ?? 'current',
           role: ChatRole.assistant,
           content: '',
           createdAt: DateTime.now(),
@@ -174,13 +246,17 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     }
 
     try {
-      final List<String> memory = await _memoryPrompts();
-      await for (final String chunk in router.streamMessage(
-        request,
+      final List<String> memory = await _memoryPrompts(text);
+      final List<ChatMessage> contextRequest = _trimMessages(request, memory, router.config.defaultModel);
+      await for (final AgentStreamChunk chunk in router.streamMessage(
+        contextRequest,
         tools: _tools(),
         systemPrompts: memory,
       )) {
-        buffer.write(chunk);
+        buffer.write(chunk.text);
+        if (chunk.reasoning.isNotEmpty) {
+          _reasoning[assistantId] = '${_reasoning[assistantId] ?? ''}${chunk.reasoning}';
+        }
         scheduleFlush();
       }
       flushTimer?.cancel();
@@ -205,6 +281,40 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     } finally {
       if (mounted) setState(() => _sending = false);
     }
+  }
+
+  List<ChatMessage> _trimMessages(List<ChatMessage> messages, List<String> memory, String model) {
+    final int limit = ModelCapabilitiesRegistry.forModel(model).maxContextTokens;
+    final int budgetChars = (limit * 4 - memory.join('\n').length).clamp(2000, limit * 4);
+    var used = 0;
+    final List<ChatMessage> result = <ChatMessage>[];
+    for (final ChatMessage message in messages.reversed) {
+      final int cost = message.content.length;
+      if (used + cost > budgetChars && result.isNotEmpty) break;
+      result.add(message);
+      used += cost;
+    }
+    return result.reversed.toList(growable: false);
+  }
+
+  int _estimatedContextTokens() {
+    return _messages.fold<int>(0, (int total, ChatMessage message) => total + (message.content.length / 4).ceil());
+  }
+
+  Widget _statsBar(ProviderConfig? active) {
+    final int limit = ModelCapabilitiesRegistry.forModel(active?.defaultModel ?? '').maxContextTokens;
+    final int used = _estimatedContextTokens();
+    final int remaining = ((1 - used / limit) * 100).round().clamp(0, 100);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+      child: Row(children: <Widget>[
+        Text('本轮 Token ${_input.text.length ~/ 4} · 上下文已用 $used · 剩余 $remaining%', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+        const Spacer(),
+        Icon(_webSearch ? Icons.public : Icons.public_off, size: 15, color: _webSearch ? Theme.of(context).colorScheme.primary : AppColors.textSecondary),
+        const SizedBox(width: 4),
+        Text(_webSearch ? '联网开' : '联网关', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+      ]),
+    );
   }
 
   void _scrollToBottom() {
@@ -255,13 +365,17 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
   }
 
+  static String _formatSessionDate(DateTime value) => '${value.year}/${value.month.toString().padLeft(2, '0')}/${value.day.toString().padLeft(2, '0')} ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+
   @override
   Widget build(BuildContext context) {
     final ProviderConfig? active = ref.watch(activeProviderProvider);
     return Scaffold(
       appBar: AppBar(
         title: const Text('会话'),
+        leading: IconButton(tooltip: '历史会话', icon: const Icon(Icons.history), onPressed: _showHistory),
         actions: <Widget>[
+          IconButton(tooltip: '新建对话', icon: const Icon(Icons.add_comment_outlined), onPressed: _newSession),
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: ActionChip(
@@ -291,9 +405,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     itemCount: _messages.length,
                     itemBuilder: (BuildContext context, int index) => _Bubble(
                       message: _messages[index],
+                      reasoning: _reasoning[_messages[index].id],
                     ),
                   ),
           ),
+          _statsBar(active),
           SafeArea(
             top: false,
             child: Padding(
@@ -307,10 +423,16 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       minLines: 1,
                       maxLines: 4,
                       onSubmitted: (_) => _send(),
+                      onChanged: (_) => setState(() {}),
                       decoration: const InputDecoration(hintText: '记点什么…'),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  IconButton(
+                    tooltip: '联网搜索',
+                    onPressed: () => setState(() => _webSearch = !_webSearch),
+                    icon: Icon(_webSearch ? Icons.public : Icons.public_off),
+                  ),
+                  const SizedBox(width: 4),
                   IconButton.filled(
                     onPressed: _sending ? null : _send,
                     tooltip: '发送',
@@ -333,9 +455,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 }
 
 class _Bubble extends StatelessWidget {
-  const _Bubble({required this.message});
+  const _Bubble({required this.message, this.reasoning});
 
   final ChatMessage message;
+  final String? reasoning;
 
   @override
   Widget build(BuildContext context) {
@@ -353,7 +476,21 @@ class _Bubble extends StatelessWidget {
               : AppColors.card,
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Text(message.content.isEmpty ? '…' : message.content),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            if (reasoning != null && reasoning!.isNotEmpty)
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: EdgeInsets.zero,
+                title: const Text('思考过程', style: TextStyle(fontSize: 12)),
+                children: <Widget>[
+                  Text(reasoning!, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                ],
+              ),
+            Text(message.content.isEmpty ? '…' : message.content),
+          ],
+        ),
       ),
     );
   }

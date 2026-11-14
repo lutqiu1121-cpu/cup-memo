@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -6,6 +7,7 @@ import '../../core/utils/id.dart';
 import '../../providers/app_providers.dart';
 import '../../services/provider/provider_config.dart';
 import '../../services/provider/provider_presets.dart';
+import '../../services/provider/model_capabilities.dart';
 
 /// Add / edit form for a [ProviderConfig].
 ///
@@ -35,6 +37,14 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
   ProviderKind _kind = ProviderKind.openaiCompatible;
   bool _isDefault = false;
   bool _saving = false;
+  bool _loadingModels = false;
+  List<String> _models = const <String>[];
+  ModelCapabilities _capabilities = const ModelCapabilities(model: '');
+  double _temperature = 0.7;
+  int _maxTokens = 4096;
+  bool _thinking = false;
+  String _thinkingLevel = 'medium';
+  double _thinkingBudget = 4096;
 
   @override
   void initState() {
@@ -47,6 +57,11 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
       _headers.text = ProviderConfig.headersToText(existing.extraHeaders);
       _kind = existing.kind;
       _isDefault = existing.isDefault;
+      _temperature = (existing.modelParameters['temperature'] as num?)?.toDouble() ?? 0.7;
+      _maxTokens = (existing.modelParameters['max_tokens'] as num?)?.toInt() ?? 4096;
+      _thinking = existing.modelParameters['thinking_enabled'] == true;
+      _thinkingLevel = existing.modelParameters['thinking_level']?.toString() ?? 'medium';
+      _thinkingBudget = (existing.modelParameters['thinking_budget'] as num?)?.toDouble() ?? 4096;
       _preset = ProviderPresets.all.firstWhere(
         (ProviderPreset preset) => preset.kind == existing.kind,
         orElse: () => ProviderPresets.custom,
@@ -86,6 +101,38 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
     });
   }
 
+  Future<void> _fetchModels() async {
+    final String base = _baseUrl.text.trim().replaceFirst(RegExp(r'/+$'), '');
+    if (base.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请先填写 baseUrl')));
+      return;
+    }
+    setState(() => _loadingModels = true);
+    try {
+      final response = await Dio().get<Map<String, dynamic>>(
+        '$base/models',
+        options: Options(headers: _apiKey.text.trim().isEmpty ? null : <String, String>{'Authorization': 'Bearer ${_apiKey.text.trim()}'}),
+      );
+      final data = response.data?['data'];
+      final models = data is List
+          ? data.map((Object? value) => value is Map ? value['id']?.toString() : value?.toString()).whereType<String>().where((String value) => value.isNotEmpty).toList()
+          : const <String>[];
+      if (!mounted) return;
+      setState(() { _models = models; _loadingModels = false; });
+      if (models.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('接口未返回可用模型')));
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _loadingModels = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('获取模型失败：$error')));
+    }
+  }
+
+  void _refreshCapabilities(String model) {
+    setState(() => _capabilities = ModelCapabilitiesRegistry.forModel(model));
+  }
+
   String? _validateRequired(String? value, String label) {
     if (value == null || value.trim().isEmpty) {
       return '请填写$label';
@@ -119,6 +166,14 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
       baseUrl: _baseUrl.text.trim(),
       apiKeyRef: existing?.apiKeyRef ?? newProviderId(),
       defaultModel: _model.text.trim(),
+      modelParameters: <String, dynamic>{
+        'temperature': _temperature,
+        'max_tokens': _maxTokens,
+        'context_tokens': _capabilities.maxContextTokens,
+        'thinking_enabled': _thinking,
+        if (_thinking) 'thinking_level': _thinkingLevel,
+        if (_thinking) 'thinking_budget': _thinkingBudget.toInt(),
+      },
       extraHeaders: ProviderConfig.parseHeadersText(_headers.text),
       isDefault: _isDefault,
     );
@@ -241,14 +296,48 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
               ),
             ),
             const SizedBox(height: 14),
-            TextFormField(
-              controller: _model,
-              decoration: const InputDecoration(
-                labelText: '默认模型',
-                hintText: 'deepseek-chat',
-                prefixIcon: Icon(Icons.memory_outlined),
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Expanded(
+                  child: TextFormField(
+                    controller: _model,
+                    onChanged: _refreshCapabilities,
+                    decoration: const InputDecoration(labelText: '默认模型', hintText: 'deepseek-chat', prefixIcon: Icon(Icons.memory_outlined)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: OutlinedButton.icon(
+                    onPressed: _loadingModels ? null : _fetchModels,
+                    icon: _loadingModels ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.download_outlined),
+                    label: const Text('获取模型'),
+                  ),
+                ),
+              ],
             ),
+            if (_models.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                initialValue: _models.contains(_model.text) ? _model.text : null,
+                decoration: const InputDecoration(labelText: '模型列表选择'),
+                items: _models.map((String model) => DropdownMenuItem<String>(value: model, child: Text(model))).toList(),
+                onChanged: (String? value) { if (value != null) { _model.text = value; _refreshCapabilities(value); } },
+              ),
+            ],
+            const SizedBox(height: 14),
+            Text('Temperature：${_temperature.toStringAsFixed(1)}'),
+            Slider(value: _temperature, min: 0, max: 2, divisions: 20, onChanged: (double value) => setState(() => _temperature = value)),
+            TextField(controller: TextEditingController(text: _maxTokens.toString()), keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Max Tokens'), onSubmitted: (String value) { final parsed = int.tryParse(value); if (parsed != null) setState(() => _maxTokens = parsed.clamp(1, _capabilities.maxContextTokens)); }),
+            if (_capabilities.supportsThinking)
+              SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('开启思考模式'), value: _thinking, onChanged: (bool value) => setState(() => _thinking = value)),
+            if (_thinking && _capabilities.supportsThinkingLevels)
+              DropdownButtonFormField<String>(initialValue: _capabilities.thinkingLevels.contains(_thinkingLevel) ? _thinkingLevel : _capabilities.thinkingLevels.first, decoration: const InputDecoration(labelText: '思考等级'), items: _capabilities.thinkingLevels.map((String value) => DropdownMenuItem<String>(value: value, child: Text(value))).toList(), onChanged: (String? value) { if (value != null) setState(() => _thinkingLevel = value); }),
+            if (_thinking && _capabilities.supportsThinkingBudget) ...<Widget>[
+              Text('思考预算：${_thinkingBudget.toInt()} tokens'),
+              Slider(value: _thinkingBudget.clamp(256, _capabilities.maxContextTokens.toDouble()), min: 256, max: _capabilities.maxContextTokens.toDouble(), divisions: 20, onChanged: (double value) => setState(() => _thinkingBudget = value)),
+            ],
             const SizedBox(height: 14),
             TextFormField(
               controller: _headers,
@@ -281,7 +370,7 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
             ),
             const SizedBox(height: 10),
             Text(
-              '本阶段不发起任何真实 API 请求；保存后只写入本地配置。',
+              'API Key 保存在系统安全沙盒中，本地数据库仅记录引用。',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: AppColors.textSecondary,
               ),

@@ -3,6 +3,12 @@ import 'package:dart_agent_core/dart_agent_core.dart';
 import '../../models/chat_message.dart';
 import 'provider_config.dart';
 
+class AgentStreamChunk {
+  const AgentStreamChunk({this.text = '', this.reasoning = ''});
+  final String text;
+  final String reasoning;
+}
+
 /// Result of one completed assistant response.
 class ChatCompletion {
   const ChatCompletion({
@@ -29,7 +35,7 @@ abstract class ProviderClient {
     List<String> systemPrompts = const <String>[],
   });
 
-  Stream<String> streamMessage(
+  Stream<AgentStreamChunk> streamMessage(
     List<ChatMessage> messages, {
     String? model,
     List<Tool>? tools,
@@ -56,7 +62,23 @@ class AgentProviderClient implements ProviderClient {
   }
 
   ModelConfig _model(String? model) {
-    return ModelConfig(model: model ?? config.defaultModel);
+    final Map<String, dynamic> parameters = config.modelParameters;
+    final Map<String, dynamic> extra = <String, dynamic>{};
+    final bool thinking = parameters['thinking_enabled'] == true;
+    final String? level = parameters['thinking_level']?.toString();
+    final int? budget = (parameters['thinking_budget'] as num?)?.toInt();
+    if (thinking && level != null && level.isNotEmpty) {
+      extra['reasoning_effort'] = level;
+    }
+    if (thinking && budget != null) {
+      extra['thinking'] = <String, dynamic>{'type': 'enabled', 'budget_tokens': budget};
+    }
+    return ModelConfig(
+      model: model ?? config.defaultModel,
+      temperature: (parameters['temperature'] as num?)?.toDouble(),
+      maxTokens: (parameters['max_tokens'] as num?)?.toInt(),
+      extra: extra.isEmpty ? null : extra,
+    );
   }
 
   List<LLMMessage> _messages(List<ChatMessage> messages) {
@@ -106,7 +128,7 @@ class AgentProviderClient implements ProviderClient {
   }
 
   @override
-  Stream<String> streamMessage(
+  Stream<AgentStreamChunk> streamMessage(
     List<ChatMessage> messages, {
     String? model,
     List<Tool>? tools,
@@ -125,7 +147,11 @@ class AgentProviderClient implements ProviderClient {
       if (event.eventType == StreamingEventType.modelChunkMessage) {
         final ModelMessage chunk = event.data as ModelMessage;
         final String? text = chunk.textOutput;
-        if (text != null && text.isNotEmpty) yield text;
+        final String textValue = text ?? '';
+        final String reasoning = chunk.thought ?? '';
+        if (textValue.isNotEmpty || reasoning.isNotEmpty) {
+          yield AgentStreamChunk(text: textValue, reasoning: reasoning);
+        }
       }
     }
   }
@@ -163,7 +189,7 @@ class ProviderRouter {
     );
   }
 
-  Stream<String> streamMessage(
+  Stream<AgentStreamChunk> streamMessage(
     List<ChatMessage> messages, {
     String? model,
     List<Tool>? tools,
