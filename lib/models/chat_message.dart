@@ -34,6 +34,7 @@ class ChatMessage {
     this.providerId,
     this.model,
     this.parentId,
+    this.childrenIds = const <String>[],
   });
 
   final String id;
@@ -46,6 +47,7 @@ class ChatMessage {
   final String? providerId;
   final String? model;
   final String? parentId;
+  final List<String> childrenIds;
 
   bool get isUser => role == ChatRole.user;
 
@@ -59,6 +61,7 @@ class ChatMessage {
       'provider_id': providerId,
       'model': model,
       'parent_id': parentId,
+      'children_ids': childrenIds.join(','),
     };
   }
 
@@ -74,6 +77,10 @@ class ChatMessage {
       providerId: row['provider_id'] as String?,
       model: row['model'] as String?,
       parentId: row['parent_id'] as String?,
+      childrenIds: (row['children_ids'] as String? ?? '')
+          .split(',')
+          .where((String id) => id.isNotEmpty)
+          .toList(growable: false),
     );
   }
 

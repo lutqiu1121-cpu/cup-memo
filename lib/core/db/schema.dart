@@ -7,7 +7,7 @@ class Schema {
   const Schema._();
 
   /// Current database version, mirrored into `PRAGMA user_version`.
-  static const int version = 6;
+  static const int version = 7;
 
   /// File name of the database inside the application support directory.
   static const String databaseFileName = 'cup_memo.db';
@@ -19,6 +19,7 @@ class Schema {
     _createCurrentTasks,
     _createHistoryTasks,
     _createChatSessions,
+    _createChatMessages,
     _createSearchCache,
     _createProviders,
   ];
@@ -82,6 +83,12 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
   message_count INTEGER DEFAULT 0
 )
 ''';
+
+  static const String _createChatMessages = '''
+ CREATE TABLE IF NOT EXISTS chat_messages (
+   id TEXT PRIMARY KEY, session_id TEXT NOT NULL, parent_id TEXT, children_ids TEXT DEFAULT '[]', role TEXT NOT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL, provider_id TEXT, model TEXT, active INTEGER DEFAULT 1
+ )
+ ''';
 
   static const String _createSearchCache = '''
 CREATE TABLE IF NOT EXISTS search_cache (

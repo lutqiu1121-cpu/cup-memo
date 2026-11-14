@@ -30,6 +30,9 @@ Future<void> main() async {
   AppDatabase? database;
   try {
     database = await AppDatabase.open();
+    database.raw.execute(
+      "DELETE FROM chat_messages WHERE content LIKE '%<script>%' OR content LIKE '%waf%'",
+    );
   } catch (error, stackTrace) {
     // Degraded mode: the app still boots (5 tabs + settings), only the
     // provider screens report the missing database.

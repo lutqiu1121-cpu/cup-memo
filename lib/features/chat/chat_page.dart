@@ -435,10 +435,9 @@ class ChatPageState extends ConsumerState<ChatPage> {
   ) {
     final int limit =
         ModelCapabilitiesRegistry.forModel(model).maxContextTokens ?? 0;
-    final int budgetChars = (limit * 4 - memory.join('\n').length).clamp(
-      2000,
-      limit * 4,
-    );
+    final int budgetChars = limit > 0
+        ? (limit * 4 - memory.join('\n').length).clamp(0, limit * 4)
+        : 0;
     var used = 0;
     final List<ChatMessage> result = <ChatMessage>[];
     for (final ChatMessage message in messages.reversed) {
@@ -513,30 +512,10 @@ class ChatPageState extends ConsumerState<ChatPage> {
     );
     if (!caps.supportsThinking && _thinkingEnabled) _thinkingEnabled = false;
     return PopScope(
-      canPop: !_sending,
-      onPopInvokedWithResult: (bool didPop, Object? result) async {
-        if (didPop || !_sending || !mounted) return;
-        final bool leave =
-            await showDialog<bool>(
-              context: context,
-              builder: (BuildContext dialogContext) => AlertDialog(
-                title: const Text('停止生成并离开？'),
-                actions: <Widget>[
-                  TextButton(
-                    onPressed: () => Navigator.pop(dialogContext, false),
-                    child: const Text('取消'),
-                  ),
-                  FilledButton(
-                    onPressed: () => Navigator.pop(dialogContext, true),
-                    child: const Text('离开'),
-                  ),
-                ],
-              ),
-            ) ??
-            false;
-        if (leave && mounted) {
-          _activeTurnId++;
-          if (context.mounted) Navigator.of(context).pop(result);
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (!didPop) {
+          appShellScaffoldKey.currentState?.openDrawer();
         }
       },
       child: Scaffold(
