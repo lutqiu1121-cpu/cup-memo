@@ -38,6 +38,9 @@ class ChatPageState extends ConsumerState<ChatPage> {
   bool _webSearch = false;
   bool _toolsEnabled = true;
   bool _thinkingEnabled = false;
+  String? _selectedModel;
+
+  String _modelFor(ProviderConfig? provider) => _selectedModel ?? provider?.defaultModel ?? '';
 
   @override
   void initState() {
@@ -189,7 +192,7 @@ class ChatPageState extends ConsumerState<ChatPage> {
       content: text,
       createdAt: DateTime.now(),
       providerId: router.config.id,
-      model: router.config.defaultModel,
+      model: _modelFor(router.config),
     );
     final List<ChatMessage> request = <ChatMessage>[..._messages, user];
     final String assistantId = newMessageId();
@@ -204,7 +207,7 @@ class ChatPageState extends ConsumerState<ChatPage> {
           content: '',
           createdAt: DateTime.now(),
           providerId: router.config.id,
-          model: router.config.defaultModel,
+          model: _modelFor(router.config),
         ),
       );
       _sending = true;
@@ -239,8 +242,8 @@ class ChatPageState extends ConsumerState<ChatPage> {
 
     try {
       final List<String> memory = await _memoryPrompts(text);
-      final List<ChatMessage> contextRequest = _trimMessages(request, memory, router.config.defaultModel);
-      debugPrint('CupMemo Agent payload: model=${router.config.defaultModel} messages=${contextRequest.length} systemPrompts=${memory.length} tools=${_toolsEnabled ? _tools().length : 0}');
+      final List<ChatMessage> contextRequest = _trimMessages(request, memory, _modelFor(router.config));
+      debugPrint('CupMemo Agent payload: model=${_modelFor(router.config)} messages=${contextRequest.length} systemPrompts=${memory.length} tools=${_toolsEnabled ? _tools().length : 0}');
       await for (final AgentStreamChunk chunk in router.streamMessage(
         contextRequest,
         tools: _toolsEnabled ? _tools() : null,
@@ -295,7 +298,7 @@ class ChatPageState extends ConsumerState<ChatPage> {
   }
 
   Widget _statsBar(ProviderConfig? active) {
-    final int limit = ModelCapabilitiesRegistry.forModel(active?.defaultModel ?? '').maxContextTokens;
+    final int limit = ModelCapabilitiesRegistry.forModel(_modelFor(active), manualOverride: active?.modelParameters).maxContextTokens;
     final int used = _estimatedContextTokens();
     final int remaining = ((1 - used / limit) * 100).round().clamp(0, 100);
     return Padding(
@@ -363,6 +366,9 @@ class ChatPageState extends ConsumerState<ChatPage> {
   @override
   Widget build(BuildContext context) {
     final ProviderConfig? active = ref.watch(activeProviderProvider);
+    final String activeModel = _modelFor(active);
+    final ModelCapabilities caps = ModelCapabilitiesRegistry.forModel(activeModel, manualOverride: active?.modelParameters);
+    if (!caps.supportsThinking && _thinkingEnabled) _thinkingEnabled = false;
     return Scaffold(
       appBar: AppBar(
         title: const Text('会话'),
@@ -402,12 +408,17 @@ class ChatPageState extends ConsumerState<ChatPage> {
                     ),
                   ),
           ),
-          Padding(padding: const EdgeInsets.fromLTRB(16, 4, 16, 0), child: Row(children: <Widget>[
-            FilterChip(avatar: Icon(_thinkingEnabled ? Icons.psychology : Icons.psychology_outlined, size: 16), label: const Text('深度思考'), selected: _thinkingEnabled, onSelected: (bool value) => setState(() => _thinkingEnabled = value)),
-            const SizedBox(width: 8),
-            FilterChip(avatar: Icon(_webSearch ? Icons.public : Icons.public_off, size: 16), label: const Text('联网搜索'), selected: _webSearch, onSelected: (bool value) => setState(() => _webSearch = value)),
+          Padding(padding: const EdgeInsets.fromLTRB(16, 4, 16, 0), child: Column(children: <Widget>[
+            if (active != null && active.availableModels.isNotEmpty)
+              DropdownButton<String>(value: active.availableModels.contains(activeModel) ? activeModel : null, isExpanded: true, underline: const SizedBox.shrink(), items: active.availableModels.map((String model) => DropdownMenuItem<String>(value: model, child: Text(model))).toList(), onChanged: (String? value) { if (value != null) setState(() { _selectedModel = value; _thinkingEnabled = ModelCapabilitiesRegistry.forModel(value, manualOverride: active.modelParameters).supportsThinking; }); })
+            else
+              Align(alignment: Alignment.centerLeft, child: Text('模型：$activeModel', style: Theme.of(context).textTheme.labelMedium)),
+            Row(children: <Widget>[
+              FilterChip(avatar: Icon(_thinkingEnabled ? Icons.psychology : Icons.psychology_outlined, size: 16), label: const Text('深度思考'), selected: _thinkingEnabled, onSelected: caps.supportsThinking ? (bool value) => setState(() => _thinkingEnabled = value) : null),
+              const SizedBox(width: 8),
+              FilterChip(avatar: Icon(_webSearch ? Icons.public : Icons.public_off, size: 16), label: const Text('联网搜索'), selected: _webSearch, onSelected: (bool value) => setState(() => _webSearch = value)),
+            ]),
           ])),
-
           SafeArea(
             top: false,
             child: Padding(

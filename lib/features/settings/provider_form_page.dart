@@ -74,7 +74,7 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
             preset.baseUrl == existing.baseUrl,
         orElse: () => ProviderPresets.custom,
       );
-      _capabilities = ModelCapabilitiesRegistry.forModel(existing.defaultModel);
+      _capabilities = ModelCapabilitiesRegistry.resolveModelCaps(model: existing.defaultModel, manualOverride: existing.modelParameters);
     }
   }
 
@@ -212,6 +212,7 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
       baseUrl: _baseUrl.text.trim(),
       apiKeyRef: existing?.apiKeyRef ?? newProviderId(),
       defaultModel: _model.text.trim(),
+      availableModels: _models,
       modelParameters: <String, dynamic>{
         'temperature': _temperature,
         'max_tokens': _maxTokens,
