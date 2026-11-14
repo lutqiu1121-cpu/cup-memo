@@ -512,165 +512,194 @@ class ChatPageState extends ConsumerState<ChatPage> {
       manualOverride: active?.modelParameters,
     );
     if (!caps.supportsThinking && _thinkingEnabled) _thinkingEnabled = false;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('会话'),
-        leading: IconButton(
-          tooltip: '菜单',
-          icon: const Icon(Icons.menu),
-          onPressed: () => appShellScaffoldKey.currentState?.openDrawer(),
+    return PopScope(
+      canPop: !_sending,
+      onPopInvokedWithResult: (bool didPop, Object? result) async {
+        if (didPop || !_sending || !mounted) return;
+        final bool leave =
+            await showDialog<bool>(
+              context: context,
+              builder: (BuildContext dialogContext) => AlertDialog(
+                title: const Text('停止生成并离开？'),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                    child: const Text('取消'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(dialogContext, true),
+                    child: const Text('离开'),
+                  ),
+                ],
+              ),
+            ) ??
+            false;
+        if (leave && mounted) {
+          _activeTurnId++;
+          if (context.mounted) Navigator.of(context).pop(result);
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('会话'),
+          leading: IconButton(
+            tooltip: '菜单',
+            icon: const Icon(Icons.menu),
+            onPressed: () => appShellScaffoldKey.currentState?.openDrawer(),
+          ),
+          actions: <Widget>[
+            IconButton(
+              tooltip: '新建对话',
+              icon: const Icon(Icons.add_comment_outlined),
+              onPressed: _newSession,
+            ),
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: ActionChip(
+                avatar: const Icon(Icons.hub_outlined, size: 16),
+                label: Text(active?.name ?? '未配置 Provider'),
+                onPressed: _pickProvider,
+              ),
+            ),
+          ],
         ),
-        actions: <Widget>[
-          IconButton(
-            tooltip: '新建对话',
-            icon: const Icon(Icons.add_comment_outlined),
-            onPressed: _newSession,
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: ActionChip(
-              avatar: const Icon(Icons.hub_outlined, size: 16),
-              label: Text(active?.name ?? '未配置 Provider'),
-              onPressed: _pickProvider,
-            ),
-          ),
-        ],
-      ),
-      body: Column(
-        children: <Widget>[
-          Expanded(
-            child: _messages.isEmpty
-                ? EmptyState(
-                    icon: Icons.forum_outlined,
-                    title: active == null ? '还没有可用的 Provider' : '会话尚未开始',
-                    description: active == null
-                        ? '先在设置中添加 Provider 与 API Key。'
-                        : '输入消息开始流式对话。AI 可调用本地搜索和创建条目工具。',
-                    actionLabel: active == null ? '去配置 Provider' : null,
-                    onAction: active == null ? _pickProvider : null,
-                  )
-                : ListView.builder(
-                    controller: _scroll,
-                    addAutomaticKeepAlives: false,
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                    itemCount: _messages.length,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    itemBuilder: (BuildContext context, int index) => _Bubble(
-                      message: _messages[index],
-                      reasoning: _reasoning[_messages[index].id],
-                    ),
-                  ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-            child: Column(
-              children: <Widget>[
-                if (active != null && active.availableModels.isNotEmpty)
-                  DropdownButton<String>(
-                    value: active.availableModels.contains(activeModel)
-                        ? activeModel
-                        : null,
-                    isExpanded: true,
-                    underline: const SizedBox.shrink(),
-                    items: active.availableModels
-                        .map(
-                          (String model) => DropdownMenuItem<String>(
-                            value: model,
-                            child: Text(model),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (String? value) {
-                      if (value != null) {
-                        setState(() {
-                          _selectedModel = value;
-                          _thinkingEnabled = ModelCapabilitiesRegistry.forModel(
-                            value,
-                            manualOverride: active.modelParameters,
-                          ).supportsThinking;
-                        });
-                      }
-                    },
-                  )
-                else
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      '模型：$activeModel',
-                      style: Theme.of(context).textTheme.labelMedium,
-                    ),
-                  ),
-                Row(
-                  children: <Widget>[
-                    FilterChip(
-                      avatar: Icon(
-                        _thinkingEnabled
-                            ? Icons.psychology
-                            : Icons.psychology_outlined,
-                        size: 16,
+        body: Column(
+          children: <Widget>[
+            Expanded(
+              child: _messages.isEmpty
+                  ? EmptyState(
+                      icon: Icons.forum_outlined,
+                      title: active == null ? '还没有可用的 Provider' : '会话尚未开始',
+                      description: active == null
+                          ? '先在设置中添加 Provider 与 API Key。'
+                          : '输入消息开始流式对话。AI 可调用本地搜索和创建条目工具。',
+                      actionLabel: active == null ? '去配置 Provider' : null,
+                      onAction: active == null ? _pickProvider : null,
+                    )
+                  : ListView.builder(
+                      controller: _scroll,
+                      addAutomaticKeepAlives: false,
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                      itemCount: _messages.length,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      itemBuilder: (BuildContext context, int index) => _Bubble(
+                        message: _messages[index],
+                        reasoning: _reasoning[_messages[index].id],
                       ),
-                      label: const Text('深度思考'),
-                      selected: _thinkingEnabled,
-                      onSelected: caps.supportsThinking
-                          ? (bool value) =>
-                                setState(() => _thinkingEnabled = value)
-                          : null,
                     ),
-                    const SizedBox(width: 8),
-                    FilterChip(
-                      avatar: Icon(
-                        _webSearch ? Icons.public : Icons.public_off,
-                        size: 16,
-                      ),
-                      label: const Text('联网搜索'),
-                      selected: _webSearch,
-                      onSelected: (bool value) =>
-                          setState(() => _webSearch = value),
-                    ),
-                  ],
-                ),
-              ],
             ),
-          ),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+              child: Column(
                 children: <Widget>[
-                  Expanded(
-                    child: TextField(
-                      controller: _input,
-                      minLines: 1,
-                      maxLines: 4,
-                      onSubmitted: (_) => _send(),
-                      onChanged: (_) => setState(() {}),
-                      decoration: const InputDecoration(hintText: '记点什么…'),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: '联网搜索',
-                    onPressed: () => setState(() => _webSearch = !_webSearch),
-                    icon: Icon(_webSearch ? Icons.public : Icons.public_off),
-                  ),
-                  const SizedBox(width: 4),
-                  IconButton.filled(
-                    onPressed: _sending ? null : _send,
-                    tooltip: '发送',
-                    icon: _sending
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                  if (active != null && active.availableModels.isNotEmpty)
+                    DropdownButton<String>(
+                      value: active.availableModels.contains(activeModel)
+                          ? activeModel
+                          : null,
+                      isExpanded: true,
+                      underline: const SizedBox.shrink(),
+                      items: active.availableModels
+                          .map(
+                            (String model) => DropdownMenuItem<String>(
+                              value: model,
+                              child: Text(model),
+                            ),
                           )
-                        : const Icon(Icons.arrow_upward),
+                          .toList(),
+                      onChanged: (String? value) {
+                        if (value != null) {
+                          setState(() {
+                            _selectedModel = value;
+                            _thinkingEnabled =
+                                ModelCapabilitiesRegistry.forModel(
+                                  value,
+                                  manualOverride: active.modelParameters,
+                                ).supportsThinking;
+                          });
+                        }
+                      },
+                    )
+                  else
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '模型：$activeModel',
+                        style: Theme.of(context).textTheme.labelMedium,
+                      ),
+                    ),
+                  Row(
+                    children: <Widget>[
+                      FilterChip(
+                        avatar: Icon(
+                          _thinkingEnabled
+                              ? Icons.psychology
+                              : Icons.psychology_outlined,
+                          size: 16,
+                        ),
+                        label: const Text('深度思考'),
+                        selected: _thinkingEnabled,
+                        onSelected: caps.supportsThinking
+                            ? (bool value) =>
+                                  setState(() => _thinkingEnabled = value)
+                            : null,
+                      ),
+                      const SizedBox(width: 8),
+                      FilterChip(
+                        avatar: Icon(
+                          _webSearch ? Icons.public : Icons.public_off,
+                          size: 16,
+                        ),
+                        label: const Text('联网搜索'),
+                        selected: _webSearch,
+                        onSelected: (bool value) =>
+                            setState(() => _webSearch = value),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
-          ),
-        ],
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: <Widget>[
+                    Expanded(
+                      child: TextField(
+                        controller: _input,
+                        minLines: 1,
+                        maxLines: 4,
+                        onSubmitted: (_) => _send(),
+                        onChanged: (_) => setState(() {}),
+                        decoration: const InputDecoration(hintText: '记点什么…'),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: '联网搜索',
+                      onPressed: () => setState(() => _webSearch = !_webSearch),
+                      icon: Icon(_webSearch ? Icons.public : Icons.public_off),
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton.filled(
+                      onPressed: _sending ? null : _send,
+                      tooltip: '发送',
+                      icon: _sending
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.arrow_upward),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -33,6 +33,7 @@ class ChatMessage {
     required this.createdAt,
     this.providerId,
     this.model,
+    this.parentId,
   });
 
   final String id;
@@ -44,6 +45,7 @@ class ChatMessage {
   /// Which provider produced the message, when it is an assistant message.
   final String? providerId;
   final String? model;
+  final String? parentId;
 
   bool get isUser => role == ChatRole.user;
 
@@ -56,6 +58,7 @@ class ChatMessage {
       'created_at': createdAt.toIso8601String(),
       'provider_id': providerId,
       'model': model,
+      'parent_id': parentId,
     };
   }
 
@@ -65,10 +68,12 @@ class ChatMessage {
       sessionId: row['session_id'] as String? ?? '',
       role: ChatRole.fromWire(row['role'] as String? ?? 'user'),
       content: row['content'] as String? ?? '',
-      createdAt: DateTime.tryParse(row['created_at'] as String? ?? '') ??
+      createdAt:
+          DateTime.tryParse(row['created_at'] as String? ?? '') ??
           DateTime.now(),
       providerId: row['provider_id'] as String?,
       model: row['model'] as String?,
+      parentId: row['parent_id'] as String?,
     );
   }
 

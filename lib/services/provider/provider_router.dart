@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dartantic_ai/dartantic_ai.dart' as da;
 import 'package:http/http.dart' as http;
 import 'package:openai_dart/openai_dart.dart' as openai;
@@ -219,10 +221,49 @@ class AgentProviderClient implements ProviderClient {
   }
 }
 
+class DiscoveredModel {
+  const DiscoveredModel({
+    required this.id,
+    this.metadata = const <String, dynamic>{},
+  });
+  final String id;
+  final Map<String, dynamic> metadata;
+}
+
 class ProviderRouter {
   const ProviderRouter(this.config, {this.apiKey});
   final ProviderConfig config;
   final String? apiKey;
+
+  Future<List<DiscoveredModel>> discoverModels() async {
+    final String base = config.baseUrl.replaceFirst(RegExp(r'/+$'), '');
+    final Uri uri = Uri.parse(
+      config.kind == ProviderKind.ollama && !base.endsWith('/v1')
+          ? '$base/v1/models'
+          : '$base/models',
+    );
+    final Map<String, String> headers = <String, String>{
+      ...config.extraHeaders,
+      if (apiKey?.isNotEmpty ?? false) 'Authorization': 'Bearer $apiKey',
+    };
+    final http.Response response = await http.get(uri, headers: headers);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError('模型发现失败：HTTP ${response.statusCode}');
+    }
+    final dynamic decoded = jsonDecode(response.body);
+    final dynamic data = decoded is Map ? decoded['data'] : decoded;
+    if (data is! List) return const <DiscoveredModel>[];
+    return data
+        .whereType<Map>()
+        .map(
+          (Map item) => DiscoveredModel(
+            id: (item['id'] ?? item['name']).toString(),
+            metadata: Map<String, dynamic>.from(item),
+          ),
+        )
+        .where((DiscoveredModel item) => item.id.isNotEmpty)
+        .toList(growable: false);
+  }
 
   ProviderClient createClient() {
     if ((apiKey == null || apiKey!.isEmpty) &&
