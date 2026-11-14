@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:dartantic_ai/dartantic_ai.dart' as da;
 import 'package:http/http.dart' as http;
 import 'package:openai_dart/openai_dart.dart' as openai;
@@ -26,35 +24,42 @@ class ChatCompletion {
   final int completionTokens;
 }
 
-/// Converts unsafe HTML/WAF responses into a JSON 502 response. Dartantic's
-/// SSE parser otherwise ignores a successful text/html response silently.
-class WafGuardClient extends http.BaseClient {
-  WafGuardClient(this._inner);
-  final http.Client _inner;
+class NonSseResponseException implements Exception {
+  const NonSseResponseException({
+    required this.uri,
+    required this.method,
+    required this.statusCode,
+    required this.contentType,
+  });
+  final Uri uri;
+  final String method;
+  final int statusCode;
+  final String? contentType;
+  @override
+  String toString() =>
+      'NonSseResponseException($method $uri -> $statusCode, $contentType)';
+}
 
+class SseSafetyClient extends http.BaseClient {
+  SseSafetyClient(this._inner);
+  final http.Client _inner;
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     final http.StreamedResponse response = await _inner.send(request);
-    final String contentType = (response.headers['content-type'] ?? '')
-        .toLowerCase();
-    final bool badStatus =
-        response.statusCode < 200 || response.statusCode >= 300;
-    final bool allowed =
-        contentType.contains('json') || contentType.contains('event-stream');
-    if (badStatus || contentType.contains('text/html') || !allowed) {
-      await response.stream.drain<void>();
-      final String body = jsonEncode(<String, dynamic>{
-        'error': <String, dynamic>{
-          'message': '请求被防火墙拦截',
-          'type': 'waf_blocked',
-        },
-      });
-      return http.StreamedResponse(
-        Stream<List<int>>.value(utf8.encode(body)),
-        502,
-        headers: const <String, String>{'content-type': 'application/json'},
-        request: response.request,
-        reasonPhrase: 'WAF Guard',
+    final bool expectsSse = (request.headers['accept'] ?? '')
+        .toLowerCase()
+        .contains('text/event-stream');
+    final String? contentType = response.headers['content-type'];
+    final bool isSse = (contentType ?? '').toLowerCase().startsWith(
+      'text/event-stream',
+    );
+    if (expectsSse &&
+        (response.statusCode < 200 || response.statusCode >= 300 || !isSse)) {
+      throw NonSseResponseException(
+        uri: request.url,
+        method: request.method,
+        statusCode: response.statusCode,
+        contentType: contentType,
       );
     }
     return response;
@@ -125,7 +130,7 @@ class AgentProviderClient implements ProviderClient {
   da.Agent _agent({String? model, List<da.Tool>? tools}) {
     final bool ollama = config.kind == ProviderKind.ollama;
     final da.OpenAIProvider provider = GuardedOpenAIProvider(
-      client: WafGuardClient(http.Client()),
+      client: SseSafetyClient(http.Client()),
       apiKey: ollama ? null : apiKey,
       apiKeyName: ollama ? null : 'OPENAI_API_KEY',
       baseUrl: Uri.parse(config.baseUrl),

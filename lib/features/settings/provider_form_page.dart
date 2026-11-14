@@ -248,7 +248,7 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
       modelParameters: <String, dynamic>{
         'temperature': _temperature,
         'max_tokens': _maxTokens,
-        'context_tokens': _capabilities.maxContextTokens,
+        'context_tokens': _capabilities.maxContextTokens ?? 8192,
         if (_manualContext) 'context_override': _contextOverride,
         if (_manualThinking) 'thinking_override': _thinking,
         'thinking_enabled': _thinking,
@@ -452,7 +452,7 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
                   setState(
                     () => _maxTokens = parsed.clamp(
                       1,
-                      _capabilities.maxContextTokens,
+                      _capabilities.maxContextTokens ?? 8192,
                     ),
                   );
                 }
@@ -464,7 +464,7 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
               subtitle: Text(
                 _manualContext
                     ? '使用自定义上限 $_contextOverride tokens'
-                    : '使用模型能力档案 ${_capabilities.maxContextTokens} tokens',
+                    : '使用模型能力档案 ${_capabilities.maxContextTokens ?? 8192} tokens',
               ),
               value: _manualContext,
               onChanged: (bool value) => setState(() => _manualContext = value),
@@ -485,12 +485,12 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
                   }
                 },
               ),
-            Text('模型上下文档案：${_capabilities.maxContextTokens} tokens'),
+            Text('模型上下文档案：${_capabilities.maxContextTokens ?? 8192} tokens'),
             Slider(
               value:
                   (_manualContext
                           ? _contextOverride
-                          : _capabilities.maxContextTokens)
+                          : _capabilities.maxContextTokens ?? 8192)
                       .toDouble()
                       .clamp(1024, 1000000),
               min: 1024,
@@ -537,10 +537,10 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
               Slider(
                 value: _thinkingBudget.clamp(
                   256,
-                  _capabilities.maxContextTokens.toDouble(),
+                  (_capabilities.maxContextTokens ?? 8192).toDouble(),
                 ),
                 min: 256,
-                max: _capabilities.maxContextTokens.toDouble(),
+                max: (_capabilities.maxContextTokens ?? 8192).toDouble(),
                 divisions: 20,
                 onChanged: (double value) =>
                     setState(() => _thinkingBudget = value),

@@ -23,6 +23,25 @@ import 'package:flutter/services.dart';
 
 import '../settings/provider_management_page.dart';
 
+class StreamingBubbleNotifier extends ValueNotifier<String> {
+  StreamingBubbleNotifier() : super('');
+  final StringBuffer _buffer = StringBuffer();
+  bool _scheduled = false;
+  void append(String delta) {
+    _buffer.write(delta);
+    if (_scheduled) return;
+    _scheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scheduled = false;
+      value = _buffer.toString();
+    });
+  }
+
+  void finalize() {
+    value = _buffer.toString();
+  }
+}
+
 /// Tab 3 — real streaming chat with tool-assisted local memory.
 class ChatPage extends ConsumerStatefulWidget {
   const ChatPage({super.key});
@@ -36,6 +55,9 @@ class ChatPageState extends ConsumerState<ChatPage> {
   final ScrollController _scroll = ScrollController();
   final List<ChatMessage> _messages = <ChatMessage>[];
   final Map<String, String> _reasoning = <String, String>{};
+  final Map<String, StreamingBubbleNotifier> _streaming =
+      <String, StreamingBubbleNotifier>{};
+  int _activeTurnId = 0;
   String? _sessionId;
   bool _sending = false;
   bool _webSearch = false;
@@ -76,6 +98,9 @@ class ChatPageState extends ConsumerState<ChatPage> {
   @override
   void dispose() {
     _input.dispose();
+    for (final StreamingBubbleNotifier notifier in _streaming.values) {
+      notifier.dispose();
+    }
     _scroll.dispose();
     super.dispose();
   }
@@ -275,6 +300,7 @@ class ChatPageState extends ConsumerState<ChatPage> {
   }
 
   Future<void> _send() async {
+    final int turnId = ++_activeTurnId;
     final String text = _input.text.trim();
     if (text.isEmpty || _sending) return;
     final ProviderRouter? router = await ref.read(
@@ -319,6 +345,8 @@ class ChatPageState extends ConsumerState<ChatPage> {
     });
     _scrollToBottom();
 
+    final StreamingBubbleNotifier live = StreamingBubbleNotifier();
+    _streaming[assistantId] = live;
     final StringBuffer buffer = StringBuffer();
     Timer? flushTimer;
     void flush() {
@@ -362,7 +390,9 @@ class ChatPageState extends ConsumerState<ChatPage> {
         tools: _toolsEnabled ? _tools() : null,
         systemPrompts: memory,
       )) {
+        if (turnId != _activeTurnId) break;
         buffer.write(chunk.text);
+        live.append(chunk.text);
         if (chunk.reasoning.isNotEmpty) {
           _reasoning[assistantId] =
               '${_reasoning[assistantId] ?? ''}${chunk.reasoning}';
@@ -370,6 +400,7 @@ class ChatPageState extends ConsumerState<ChatPage> {
         scheduleFlush();
       }
       flushTimer?.cancel();
+      live.finalize();
       flush();
     } catch (error) {
       flushTimer?.cancel();
@@ -391,6 +422,8 @@ class ChatPageState extends ConsumerState<ChatPage> {
         });
       }
     } finally {
+      _streaming.remove(assistantId);
+      live.dispose();
       if (mounted) setState(() => _sending = false);
     }
   }
@@ -400,8 +433,8 @@ class ChatPageState extends ConsumerState<ChatPage> {
     List<String> memory,
     String model,
   ) {
-    final int limit = ModelCapabilitiesRegistry.forModel(model)
-        .maxContextTokens;
+    final int limit =
+        ModelCapabilitiesRegistry.forModel(model).maxContextTokens ?? 0;
     final int budgetChars = (limit * 4 - memory.join('\n').length).clamp(
       2000,
       limit * 4,
@@ -418,6 +451,10 @@ class ChatPageState extends ConsumerState<ChatPage> {
   }
 
   void _scrollToBottom() {
+    if (_scroll.hasClients &&
+        _scroll.position.maxScrollExtent - _scroll.position.pixels > 150) {
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
         _scroll.animateTo(
@@ -514,8 +551,10 @@ class ChatPageState extends ConsumerState<ChatPage> {
                   )
                 : ListView.builder(
                     controller: _scroll,
+                    addAutomaticKeepAlives: false,
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                     itemCount: _messages.length,
+                    physics: const AlwaysScrollableScrollPhysics(),
                     itemBuilder: (BuildContext context, int index) => _Bubble(
                       message: _messages[index],
                       reasoning: _reasoning[_messages[index].id],

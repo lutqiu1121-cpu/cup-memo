@@ -8,8 +8,8 @@ enum CapabilitySource { manualOverride, providerMetadata, defaultFallback }
 class ModelCapabilities {
   const ModelCapabilities({
     required this.model,
-    this.maxContextTokens = 8192,
-    this.maxOutputTokens = 4096,
+    this.maxContextTokens,
+    this.maxOutputTokens,
     this.supportsThinking = false,
     this.thinkingLevels = const <String>[],
     this.supportsThinkingBudget = false,
@@ -17,8 +17,8 @@ class ModelCapabilities {
     this.source = CapabilitySource.defaultFallback,
   });
   final String model;
-  final int maxContextTokens;
-  final int maxOutputTokens;
+  final int? maxContextTokens;
+  final int? maxOutputTokens;
   final bool supportsThinking;
   final List<String> thinkingLevels;
   final bool supportsThinkingBudget;
@@ -35,13 +35,14 @@ class ModelCapabilities {
     String? providerFormat,
     CapabilitySource? source,
   }) {
-    final int context = maxContextTokens ?? this.maxContextTokens;
+    final int? context = maxContextTokens ?? this.maxContextTokens;
+    final int? output = maxOutputTokens ?? this.maxOutputTokens;
     return ModelCapabilities(
       model: model,
       maxContextTokens: context,
-      maxOutputTokens: (maxOutputTokens ?? this.maxOutputTokens)
-          .clamp(1, context)
-          .toInt(),
+      maxOutputTokens: context == null || output == null
+          ? output
+          : output.clamp(1, context).toInt(),
       supportsThinking: supportsThinking ?? this.supportsThinking,
       thinkingLevels: thinkingLevels ?? this.thinkingLevels,
       supportsThinkingBudget:
