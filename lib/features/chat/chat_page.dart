@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:dart_agent_core/dart_agent_core.dart';
 import 'package:flutter/material.dart';
+
+import '../../app.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -373,8 +375,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('会话'),
-        leading: IconButton(tooltip: '历史会话', icon: const Icon(Icons.history), onPressed: _showHistory),
+        leading: IconButton(tooltip: '菜单', icon: const Icon(Icons.menu), onPressed: () => appShellScaffoldKey.currentState?.openDrawer()),
         actions: <Widget>[
+          IconButton(tooltip: '历史会话', icon: const Icon(Icons.history), onPressed: _showHistory),
           IconButton(tooltip: '新建对话', icon: const Icon(Icons.add_comment_outlined), onPressed: _newSession),
           Padding(
             padding: const EdgeInsets.only(right: 12),

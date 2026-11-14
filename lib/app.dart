@@ -11,6 +11,8 @@ import 'features/search/search_page.dart';
 import 'features/settings/settings_page.dart';
 import 'features/tasks/tasks_page.dart';
 
+final GlobalKey<ScaffoldState> appShellScaffoldKey = GlobalKey<ScaffoldState>();
+
 /// Overlay style matching the fixed off-white background.
 const SystemUiOverlayStyle appOverlayStyle = SystemUiOverlayStyle(
   statusBarColor: Colors.transparent,
@@ -31,7 +33,17 @@ class CupMemoApp extends ConsumerWidget {
     return MaterialApp(
       title: 'Cup Memo',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.build(theme.seedColor),
+      theme: AppTheme.build(
+        theme.seedColor,
+        brightness: theme.brightness,
+        backgroundColor: theme.backgroundHex == null ? null : AppColors.tryParseHex(theme.backgroundHex!),
+      ),
+      darkTheme: AppTheme.build(
+        theme.seedColor,
+        brightness: Brightness.dark,
+        backgroundColor: theme.backgroundHex == null ? const Color(0xFF121212) : AppColors.tryParseHex(theme.backgroundHex!),
+      ),
+      themeMode: theme.brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
       builder: (BuildContext context, Widget? child) {
         return AnnotatedRegion<SystemUiOverlayStyle>(
           value: appOverlayStyle,
@@ -46,57 +58,41 @@ class CupMemoApp extends ConsumerWidget {
 /// Root shell with the five bottom navigation tabs.
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
-
   @override
   State<HomeShell> createState() => _HomeShellState();
 }
 
 class _HomeShellState extends State<HomeShell> {
-  static const List<Widget> _pages = <Widget>[
-    EntriesPage(),
-    SearchPage(),
-    ChatPage(),
-    TasksPage(),
-    SettingsPage(),
-  ];
+  int _index = 2;
+  static const List<Widget> _pages = <Widget>[EntriesPage(), SearchPage(), ChatPage(), TasksPage(), SettingsPage()];
+  static const List<String> _labels = <String>['备忘录', '搜索', '会话', '任务', '设置'];
+  static const List<IconData> _icons = <IconData>[Icons.menu_book_outlined, Icons.search, Icons.chat_bubble_outline, Icons.checklist_outlined, Icons.settings_outlined];
 
-  int _index = 0;
+  void _select(int index) {
+    Navigator.of(context).pop();
+    setState(() => _index = index);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _index, children: _pages),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (int value) => setState(() => _index = value),
-        destinations: const <NavigationDestination>[
-          NavigationDestination(
-            icon: Icon(Icons.menu_book_outlined),
-            selectedIcon: Icon(Icons.menu_book),
-            label: '备忘录',
+      key: appShellScaffoldKey,
+      drawer: Drawer(
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(8, 20, 8, 20),
+            children: <Widget>[
+              const Padding(padding: EdgeInsets.fromLTRB(16, 0, 16, 20), child: Text('Cup Memo', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700))),
+              ListTile(leading: const Icon(Icons.add_comment_outlined), title: const Text('新建对话'), selected: _index == 2, onTap: () { Navigator.pop(context); setState(() => _index = 2); }),
+              ListTile(leading: const Icon(Icons.history), title: const Text('历史会话'), onTap: () { Navigator.pop(context); setState(() => _index = 2); }),
+              const Divider(),
+              for (var i = 0; i < _labels.length; i++)
+                ListTile(leading: Icon(_icons[i]), title: Text(_labels[i]), selected: _index == i, onTap: () => _select(i)),
+            ],
           ),
-          NavigationDestination(
-            icon: Icon(Icons.search_outlined),
-            selectedIcon: Icon(Icons.search),
-            label: '搜索',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline),
-            selectedIcon: Icon(Icons.chat_bubble),
-            label: '会话',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.checklist_outlined),
-            selectedIcon: Icon(Icons.checklist),
-            label: '任务',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: '设置',
-          ),
-        ],
+        ),
       ),
+      body: IndexedStack(index: _index, children: _pages),
     );
   }
 }

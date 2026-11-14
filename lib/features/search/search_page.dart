@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
+import '../../app.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -154,7 +156,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     final String trimmed = _query.trim();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('搜索')),
+      appBar: AppBar(leading: IconButton(icon: const Icon(Icons.menu), onPressed: () => appShellScaffoldKey.currentState?.openDrawer()), title: const Text('搜索')),
       body: Column(
         children: <Widget>[
           Padding(

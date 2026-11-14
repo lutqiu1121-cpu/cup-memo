@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../app.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/db/dao/task_dao.dart';
@@ -174,6 +176,7 @@ class _TasksPageState extends ConsumerState<TasksPage>
     final ThemeData theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(icon: const Icon(Icons.menu), onPressed: () => appShellScaffoldKey.currentState?.openDrawer()),
         title: const Text('任务'),
         bottom: TabBar(
           controller: _tabController,

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../app.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:markdown/markdown.dart' as md;
@@ -102,6 +104,7 @@ class _EntriesPageState extends ConsumerState<EntriesPage> {
     final ThemeData theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(icon: const Icon(Icons.menu), onPressed: () => appShellScaffoldKey.currentState?.openDrawer()),
         title: const Text('备忘录'),
         actions: <Widget>[
           IconButton(tooltip: '新建备忘', onPressed: () => _openEditor(), icon: const Icon(Icons.add)),

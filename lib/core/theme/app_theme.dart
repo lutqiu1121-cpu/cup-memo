@@ -17,10 +17,10 @@ class AppTheme {
 
   static const double cardRadius = 16;
 
-  static ThemeData build(Color seedColor) {
+  static ThemeData build(Color seedColor, {Brightness brightness = Brightness.light, Color? backgroundColor}) {
     final ColorScheme scheme = ColorScheme.fromSeed(
       seedColor: seedColor,
-      brightness: Brightness.light,
+      brightness: brightness,
     ).copyWith(surface: AppColors.card, onSurface: AppColors.textPrimary);
 
     final ThemeData base = ThemeData(colorScheme: scheme, useMaterial3: true);
@@ -32,8 +32,8 @@ class AppTheme {
         );
 
     return base.copyWith(
-      scaffoldBackgroundColor: AppColors.background,
-      canvasColor: AppColors.background,
+      scaffoldBackgroundColor: backgroundColor ?? (brightness == Brightness.dark ? const Color(0xFF121212) : AppColors.background),
+      canvasColor: backgroundColor ?? (brightness == Brightness.dark ? const Color(0xFF121212) : AppColors.background),
       colorScheme: scheme,
       textTheme: textTheme,
       appBarTheme: AppBarTheme(

@@ -9,18 +9,22 @@ import 'app_theme.dart';
 /// Immutable state of the theme layer.
 @immutable
 class ThemeState {
-  const ThemeState({required this.seedColor, required this.hex});
+  const ThemeState({required this.seedColor, required this.hex, this.brightness = Brightness.light, this.backgroundHex});
 
   /// Seed colour used by [ThemeData] / `ColorScheme.fromSeed`.
   final Color seedColor;
 
   /// Normalised `#RRGGBB` of [seedColor].
   final String hex;
+  final Brightness brightness;
+  final String? backgroundHex;
 
-  ThemeState copyWith({Color? seedColor, String? hex}) {
+  ThemeState copyWith({Color? seedColor, String? hex, Brightness? brightness, String? backgroundHex}) {
     return ThemeState(
       seedColor: seedColor ?? this.seedColor,
       hex: hex ?? this.hex,
+      brightness: brightness ?? this.brightness,
+      backgroundHex: backgroundHex ?? this.backgroundHex,
     );
   }
 }
@@ -32,14 +36,18 @@ class ThemeController extends Notifier<ThemeState> {
   ThemeState build() {
     final SharedPreferences prefs = ref.watch(sharedPreferencesProvider);
     final String? stored = prefs.getString(AppTheme.seedPrefsKey);
+    final bool dark = prefs.getBool('cup_memo.theme.dark') ?? false;
+    final String? background = prefs.getString('cup_memo.theme.background');
     final Color? parsed = stored == null ? null : AppColors.tryParseHex(stored);
     if (parsed == null) {
-      return const ThemeState(
+      return ThemeState(
         seedColor: AppColors.defaultSeed,
         hex: AppColors.defaultSeedHex,
+        brightness: dark ? Brightness.dark : Brightness.light,
+        backgroundHex: background,
       );
     }
-    return ThemeState(seedColor: parsed, hex: AppColors.toHex(parsed));
+    return ThemeState(seedColor: parsed, hex: AppColors.toHex(parsed), brightness: dark ? Brightness.dark : Brightness.light, backgroundHex: background);
   }
 
   /// Applies [hex] (`#RRGGBB`, `RRGGBB`, …) and persists it.
@@ -52,7 +60,7 @@ class ThemeController extends Notifier<ThemeState> {
       return false;
     }
     final String normalised = AppColors.toHex(parsed);
-    state = ThemeState(seedColor: parsed, hex: normalised);
+    state = state.copyWith(seedColor: parsed, hex: normalised);
     final SharedPreferences prefs = ref.read(sharedPreferencesProvider);
     await prefs.setString(AppTheme.seedPrefsKey, normalised);
     return true;
@@ -60,6 +68,21 @@ class ThemeController extends Notifier<ThemeState> {
 
   /// Restores the default off-white (米白) seed.
   Future<bool> resetToDefault() => setColor(AppColors.defaultSeedHex);
+
+  Future<void> setBrightness(Brightness brightness) async {
+    state = state.copyWith(brightness: brightness);
+    await ref.read(sharedPreferencesProvider).setBool('cup_memo.theme.dark', brightness == Brightness.dark);
+  }
+
+  Future<void> setBackgroundHex(String? hex) async {
+    state = state.copyWith(backgroundHex: hex);
+    final prefs = ref.read(sharedPreferencesProvider);
+    if (hex == null) {
+      await prefs.remove('cup_memo.theme.background');
+    } else {
+      await prefs.setString('cup_memo.theme.background', hex);
+    }
+  }
 
   /// Applies one of the categorised preset themes.
   Future<bool> setPreset(PresetTheme preset) => setColor(preset.hex);

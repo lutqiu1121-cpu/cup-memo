@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../app.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -73,7 +75,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final ProviderConfig? defaultProvider = providers.defaultProvider;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('设置')),
+      appBar: AppBar(leading: IconButton(icon: const Icon(Icons.menu), onPressed: () => appShellScaffoldKey.currentState?.openDrawer()), title: const Text('设置')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
         children: <Widget>[
