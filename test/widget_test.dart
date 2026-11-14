@@ -66,7 +66,7 @@ void main() {
     expect(find.text('未配置 Provider'), findsOneWidget);
   });
 
-  testWidgets('still-pending modules raise the placeholder snack bar',
+  testWidgets('chat shows the no-provider empty state',
       (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -93,9 +93,6 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('发送'));
-    await tester.pumpAndSettle();
-
-    expect(find.textContaining('请先配置 Provider'), findsOneWidget);
+    expect(find.text('还没有可用的 Provider'), findsOneWidget);
   });
 }
