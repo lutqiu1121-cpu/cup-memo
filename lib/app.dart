@@ -89,7 +89,7 @@ class _HomeShellState extends State<HomeShell> {
             padding: const EdgeInsets.fromLTRB(8, 20, 8, 20),
             children: <Widget>[
               const Padding(padding: EdgeInsets.fromLTRB(16, 0, 16, 20), child: Text('Cup Memo', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700))),
-              ListTile(selectedTileColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.14), selectedColor: Theme.of(context).colorScheme.primary, leading: const Icon(Icons.add_comment_outlined), title: const Text('新建对话'), selected: _index == 2, onTap: () { Navigator.pop(context); setState(() => _index = 2); }),
+              ListTile(selectedTileColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.14), selectedColor: Theme.of(context).colorScheme.primary, leading: const Icon(Icons.add_comment_outlined), title: const Text('新建对话'), onTap: () { Navigator.pop(context); setState(() => _index = 2); }),
               ListTile(selectedTileColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.14), selectedColor: Theme.of(context).colorScheme.primary, leading: const Icon(Icons.history), title: const Text('历史会话'), onTap: () { Navigator.pop(context); setState(() => _index = 2); }),
               const Divider(),
               for (var i = 0; i < _labels.length; i++)

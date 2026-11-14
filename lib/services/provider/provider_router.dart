@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:dart_agent_core/dart_agent_core.dart';
 
 import '../../models/chat_message.dart';
@@ -55,6 +58,15 @@ class AgentProviderClient implements ProviderClient {
   final String _apiKey;
 
   OpenAIClient _client() {
+    final Map<String, dynamic> parameters = config.modelParameters;
+    final Map<String, dynamic> payloadPreview = <String, dynamic>{
+      'model': parameters['model'] ?? config.defaultModel,
+      'temperature': parameters['temperature'],
+      'max_completion_tokens': parameters['max_tokens'],
+      'extra': parameters,
+    };
+    // Keep the actual request transparent during debugging without ever logging the API key.
+    debugPrint('ProviderRouter request template: ${jsonEncode(payloadPreview)}');
     return OpenAIClient(
       apiKey: _apiKey,
       baseUrl: config.baseUrl,
@@ -70,7 +82,7 @@ class AgentProviderClient implements ProviderClient {
     if (thinking && level != null && level.isNotEmpty) {
       extra['reasoning_effort'] = level;
     }
-    if (thinking && budget != null) {
+    if (thinking && budget != null && config.kind == ProviderKind.anthropic) {
       extra['thinking'] = <String, dynamic>{'type': 'enabled', 'budget_tokens': budget};
     }
     return ModelConfig(

@@ -7,7 +7,7 @@ class Schema {
   const Schema._();
 
   /// Current database version, mirrored into `PRAGMA user_version`.
-  static const int version = 4;
+  static const int version = 5;
 
   /// File name of the database inside the application support directory.
   static const String databaseFileName = 'cup_memo.db';
@@ -78,7 +78,8 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
   started_at TEXT,
   ended_at TEXT,
   archived INTEGER DEFAULT 0,
-  bound_context_ids TEXT DEFAULT '[]'
+  bound_context_ids TEXT DEFAULT '[]',
+  message_count INTEGER DEFAULT 0
 )
 ''';
 

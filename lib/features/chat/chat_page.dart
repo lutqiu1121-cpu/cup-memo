@@ -44,7 +44,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   void _ensureSession() {
     if (_sessionId != null) return;
     final db = ref.read(databaseProvider);
-    setState(() => _sessionId = db?.sessionDao.create() ?? newSessionId());
+    final empty = db?.sessionDao.findEmpty();
+    setState(() => _sessionId = empty?.id ?? db?.sessionDao.create() ?? newSessionId());
   }
 
   Future<void> _newSession() async {
@@ -179,6 +180,35 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           return 'Entry ${result.entryId} created (${result.outcome.name})';
         },
       ),
+      Tool(
+        name: 'add_task',
+        description: 'Add a current task for the user.',
+        parameterMode: ToolParameterMode.object,
+        parameters: <String, dynamic>{'type': 'object', 'properties': <String, dynamic>{'title': <String, dynamic>{'type': 'string'}, 'detail': <String, dynamic>{'type': 'string'}}, 'required': <String>['title']},
+        executable: (Map<String, dynamic> args) {
+          final dao = ref.read(databaseProvider)?.taskDao;
+          if (dao == null) return 'Database unavailable';
+          return dao.addCurrentTask(title: args['title']?.toString() ?? 'Untitled', detail: args['detail']?.toString() ?? '');
+        },
+      ),
+      Tool(
+        name: 'complete_task',
+        description: 'Complete a current task by id.',
+        parameterMode: ToolParameterMode.object,
+        parameters: <String, dynamic>{'type': 'object', 'properties': <String, dynamic>{'task_id': <String, dynamic>{'type': 'string'}}, 'required': <String>['task_id']},
+        executable: (Map<String, dynamic> args) => ref.read(databaseProvider)?.taskDao.completeTask(args['task_id']?.toString() ?? '') ?? false,
+      ),
+      Tool(
+        name: 'list_tasks',
+        description: 'List current and recently completed tasks.',
+        parameterMode: ToolParameterMode.object,
+        parameters: <String, dynamic>{'type': 'object', 'properties': <String, dynamic>{}},
+        executable: (Map<String, dynamic> args) {
+          final dao = ref.read(databaseProvider)?.taskDao;
+          if (dao == null) return 'Database unavailable';
+          return <String, dynamic>{'current': dao.listCurrent().map((t) => <String, String>{'id': t.id, 'title': t.title}).toList(), 'history': dao.listHistory().take(10).map((t) => <String, String>{'id': t.id, 'title': t.title}).toList()};
+        },
+      ),
     ];
   }
 
@@ -206,6 +236,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final String assistantId = newMessageId();
     setState(() {
       _messages.add(user);
+      ref.read(databaseProvider)?.sessionDao.incrementMessageCount(_sessionId ?? 'current');
       _messages.add(
         ChatMessage(
           id: assistantId,
@@ -250,6 +281,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     try {
       final List<String> memory = await _memoryPrompts(text);
       final List<ChatMessage> contextRequest = _trimMessages(request, memory, router.config.defaultModel);
+      debugPrint('CupMemo Agent payload: model=${router.config.defaultModel} messages=${contextRequest.length} systemPrompts=${memory.length} tools=${_tools().length}');
       await for (final AgentStreamChunk chunk in router.streamMessage(
         contextRequest,
         tools: _tools(),

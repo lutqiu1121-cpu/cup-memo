@@ -100,6 +100,9 @@ class AppDatabase {
     if (oldVersion < 4) {
       db.execute("ALTER TABLE chat_sessions ADD COLUMN bound_context_ids TEXT DEFAULT '[]'");
     }
+    if (oldVersion < 5) {
+      db.execute('ALTER TABLE chat_sessions ADD COLUMN message_count INTEGER DEFAULT 0');
+    }
   }
 
   /// Closes the underlying connection. Safe to call once.
