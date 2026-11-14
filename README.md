@@ -1,5 +1,7 @@
 # Cup Memo ☕
 
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
+
 一个本地优先（local-first）的备忘录 / 会话记录 Android 应用：记录、检索、与 AI 对话、把对话沉淀成任务与归档。
 
 > **当前阶段：可编译的 APK 框架（Framework Skeleton）**
@@ -32,7 +34,7 @@
 | --- | --- | --- |
 | 底部导航（备忘录 / 搜索 / 会话 / 任务 / 设置） | ✅ | 5 个 tab，切换正常，占位空状态 |
 | 主题系统（分类预设色板 + 自定义 hex + 持久化） | ✅ | 背景固定米白 `#FAF7F0`，卡片白色圆角 16 |
-| App 图标（极简咖啡杯 / 自适应图标） | ✅ | SVG 源 + 多密度 PNG，Android 13 自适应 + monochrome |
+| App 图标（用户提供的微拟物咖啡杯 / 自适应图标） | ✅ | `assets/icon/app_icon.png`，Android 13 自适应背景/透明前景 |
 | Provider 管理（增删改、设默认、预设） | ✅ | 列表 / 添加 / 编辑 / 删除 / 设为默认，API Key 进安全存储 |
 | 会话页 Provider 切换 | ✅ | 顶部显示当前 Provider，点击切换，仅影响后续消息 |
 | 数据库建表（含 FTS5） | ✅ | schema version 1，`onUpgrade` 空实现 + 注释 |
@@ -341,9 +343,10 @@ class PresetTheme {
 
 ## 开源许可证说明
 
-- 本项目代码：**MIT**，见 [`LICENSE`](LICENSE)（版权年份与作者为占位符
-  `<YEAR> <COPYRIGHT HOLDER>`，请按需替换）。
-- 第三方组件许可证：见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
+- 本项目代码：**GNU Affero General Public License v3.0（AGPL-3.0）**，见完整文本 [`LICENSE`](LICENSE)。
+- Copyright © 2026 lutqiu1121-cpu。
+- 第三方组件保持各自原始许可证：见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
+- 分发 APK 或提供网络服务时，应同时提供对应版本完整源码；AGPL 第 13 条涉及远程网络交互源码提供义务。
 - 运行时的完整许可证列表可在设备上通过 **设置 → 关于 → 开源许可** 查看
   （Flutter 的 `showLicensePage` 自动汇总）。
 
