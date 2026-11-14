@@ -1,7 +1,6 @@
 import 'package:cup_memo/app.dart';
 import 'package:cup_memo/core/db/database.dart';
 import 'package:cup_memo/providers/app_providers.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -9,11 +8,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('boots with five tabs and switches between them',
+  testWidgets('boots into chat and navigates through the drawer',
       (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final SharedPreferences prefs = await SharedPreferences.getInstance();
-
     final AppDatabase database = AppDatabase.inMemory();
     addTearDown(database.close);
 
@@ -28,42 +26,27 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Five destinations exist in the bottom bar.
-    expect(find.byType(NavigationBar), findsOneWidget);
-    for (final String label in <String>['备忘录', '搜索', '会话', '任务', '设置']) {
-      expect(
-        find.descendant(
-          of: find.byType(NavigationBar),
-          matching: find.text(label),
-        ),
-        findsOneWidget,
-        reason: '缺少底部导航「$label」',
-      );
-    }
+    // The chat page is now the default home page.
+    expect(find.text('还没有可用的 Provider'), findsOneWidget);
+    expect(find.byTooltip('菜单'), findsOneWidget);
 
-    // The memo tab is the initial page.
-    expect(find.text('还没有任何备忘'), findsOneWidget);
+    await tester.tap(find.byTooltip('菜单'));
+    await tester.pumpAndSettle();
+    expect(find.text('备忘录'), findsOneWidget);
+    expect(find.text('搜索'), findsOneWidget);
+    expect(find.text('任务'), findsOneWidget);
+    expect(find.text('设置'), findsOneWidget);
 
-    // Switch to the settings tab and verify the theme controls are there.
-    await tester.tap(
-      find.descendant(
-        of: find.byType(NavigationBar),
-        matching: find.text('设置'),
-      ),
-    );
+    await tester.tap(find.text('设置').last);
     await tester.pumpAndSettle();
     expect(find.text('预设色板'), findsOneWidget);
     expect(find.text('恢复默认米白'), findsOneWidget);
 
-    // Switch to the chat tab: provider entry points must be visible.
-    await tester.tap(
-      find.descendant(
-        of: find.byType(NavigationBar),
-        matching: find.text('会话'),
-      ),
-    );
+    await tester.tap(find.byTooltip('菜单'));
     await tester.pumpAndSettle();
-    expect(find.text('未配置 Provider'), findsOneWidget);
+    await tester.tap(find.text('备忘录').last);
+    await tester.pumpAndSettle();
+    expect(find.text('还没有任何备忘'), findsOneWidget);
   });
 
   testWidgets('chat shows the no-provider empty state',
@@ -84,15 +67,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Chat is still a static layout: sending shows the placeholder snack bar.
-    await tester.tap(
-      find.descendant(
-        of: find.byType(NavigationBar),
-        matching: find.text('会话'),
-      ),
-    );
-    await tester.pumpAndSettle();
-
     expect(find.text('还没有可用的 Provider'), findsOneWidget);
+    expect(find.byTooltip('新建对话'), findsOneWidget);
   });
 }
