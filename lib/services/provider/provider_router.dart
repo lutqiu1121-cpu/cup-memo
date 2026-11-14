@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:dartantic_ai/dartantic_ai.dart' as da;
