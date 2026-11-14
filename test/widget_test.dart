@@ -1,4 +1,5 @@
 import 'package:cup_memo/app.dart';
+import 'package:cup_memo/core/db/database.dart';
 import 'package:cup_memo/providers/app_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,10 +14,14 @@ void main() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final SharedPreferences prefs = await SharedPreferences.getInstance();
 
+    final AppDatabase database = AppDatabase.inMemory();
+    addTearDown(database.close);
+
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           sharedPreferencesProvider.overrideWithValue(prefs),
+          databaseProvider.overrideWithValue(database),
         ],
         child: const CupMemoApp(),
       ),
@@ -61,22 +66,34 @@ void main() {
     expect(find.text('未配置 Provider'), findsOneWidget);
   });
 
-  testWidgets('placeholder buttons raise the pending snack bar',
+  testWidgets('still-pending modules raise the placeholder snack bar',
       (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final AppDatabase database = AppDatabase.inMemory();
+    addTearDown(database.close);
 
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           sharedPreferencesProvider.overrideWithValue(prefs),
+          databaseProvider.overrideWithValue(database),
         ],
         child: const CupMemoApp(),
       ),
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('新建备忘').first);
+    // The "任务" tab is still a placeholder at this stage.
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('任务'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('新建任务').first);
     await tester.pumpAndSettle();
 
     expect(find.textContaining('该板块待实现'), findsOneWidget);

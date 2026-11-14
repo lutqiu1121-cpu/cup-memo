@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:meta/meta.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -49,7 +50,7 @@ class AppDatabase {
 
     final int currentVersion = db.userVersion;
     if (currentVersion == 0) {
-      _createSchema(db);
+      createSchema(db);
       db.userVersion = Schema.version;
     } else if (currentVersion < Schema.version) {
       onUpgrade(db, currentVersion, Schema.version);
@@ -58,10 +59,23 @@ class AppDatabase {
     return AppDatabase._(db, Directory(p.dirname(path)));
   }
 
-  static void _createSchema(Database db) {
+  /// Creates every table / FTS index. Idempotent (`CREATE ... IF NOT EXISTS`).
+  static void createSchema(Database db) {
     for (final String statement in Schema.createStatements) {
       db.execute(statement);
     }
+  }
+
+  /// In-memory database for widget tests: same schema, throw-away storage.
+  @visibleForTesting
+  factory AppDatabase.inMemory({Database? database}) {
+    final Database db = database ?? sqlite3.openInMemory();
+    createSchema(db);
+    db.userVersion = Schema.version;
+    return AppDatabase._(
+      db,
+      Directory.systemTemp.createTempSync('cup_memo_test_'),
+    );
   }
 
   /// Migration hook.
