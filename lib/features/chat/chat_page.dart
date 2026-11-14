@@ -23,10 +23,10 @@ class ChatPage extends ConsumerStatefulWidget {
   const ChatPage({super.key});
 
   @override
-  ConsumerState<ChatPage> createState() => _ChatPageState();
+  ConsumerState<ChatPage> createState() => ChatPageState();
 }
 
-class _ChatPageState extends ConsumerState<ChatPage> {
+class ChatPageState extends ConsumerState<ChatPage> {
   final TextEditingController _input = TextEditingController();
   final ScrollController _scroll = ScrollController();
   final List<ChatMessage> _messages = <ChatMessage>[];
@@ -35,6 +35,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   bool _sending = false;
   bool _webSearch = false;
   bool _toolsEnabled = true;
+  bool _thinkingEnabled = false;
 
   @override
   void initState() {
@@ -48,6 +49,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final empty = db?.sessionDao.findEmpty();
     setState(() => _sessionId = empty?.id ?? db?.sessionDao.create() ?? newSessionId());
   }
+
+  Future<void> startNewSession() => _newSession();
 
   Future<void> _newSession() async {
     final db = ref.read(databaseProvider);
@@ -352,8 +355,20 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
   }
 
+  Widget _tokenDashboard(ProviderConfig? active) {
+    final int limit = ModelCapabilitiesRegistry.forModel(active?.defaultModel ?? '').maxContextTokens;
+    final int used = _estimatedContextTokens();
+    final double progress = (used / limit).clamp(0.0, 1.0);
+    final Color color = progress > .85 ? Theme.of(context).colorScheme.error : Theme.of(context).colorScheme.primary;
+    return Row(children: <Widget>[
+      Icon(Icons.speed_rounded, size: 14, color: color),
+      const SizedBox(width: 6),
+      Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: progress, minHeight: 4, backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest, color: color))),
+      const SizedBox(width: 8),
+      Text('$used / $limit', style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+    ]);
+  }
   void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
         _scroll.animateTo(
           _scroll.position.maxScrollExtent,
@@ -410,7 +425,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         title: const Text('会话'),
         leading: IconButton(tooltip: '菜单', icon: const Icon(Icons.menu), onPressed: () => appShellScaffoldKey.currentState?.openDrawer()),
         actions: <Widget>[
-          IconButton(tooltip: '历史会话', icon: const Icon(Icons.history), onPressed: _showHistory),
           IconButton(tooltip: '新建对话', icon: const Icon(Icons.add_comment_outlined), onPressed: _newSession),
           Padding(
             padding: const EdgeInsets.only(right: 12),
@@ -446,11 +460,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   ),
           ),
           Padding(padding: const EdgeInsets.fromLTRB(16, 4, 16, 0), child: Row(children: <Widget>[
-            FilterChip(label: const Text('工具调用'), selected: _toolsEnabled, onSelected: (bool value) => setState(() => _toolsEnabled = value)),
+            FilterChip(avatar: const Icon(Icons.psychology_outlined, size: 16), label: const Text('深度思考'), selected: _thinkingEnabled, onSelected: (bool value) => setState(() => _thinkingEnabled = value)),
             const SizedBox(width: 8),
-            FilterChip(label: const Text('联网搜索'), selected: _webSearch, onSelected: (bool value) => setState(() => _webSearch = value)),
+            FilterChip(avatar: const Icon(Icons.public, size: 16), label: const Text('联网搜索'), selected: _webSearch, onSelected: (bool value) => setState(() => _webSearch = value)),
           ])),
-          _statsBar(active),
+          _tokenDashboard(active),
           SafeArea(
             top: false,
             child: Padding(
