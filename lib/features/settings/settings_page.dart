@@ -9,6 +9,7 @@ import '../../services/provider/provider_config.dart';
 import '../archive/archive_page.dart';
 import 'provider_management_page.dart';
 import 'about_licenses_page.dart';
+import 'github_settings_page.dart';
 
 /// Tab 5 — settings: theme (fully implemented) + provider management entry.
 class SettingsPage extends ConsumerStatefulWidget {
@@ -190,6 +191,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   builder: (BuildContext context) =>
                       const ProviderManagementPage(),
                 ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.code),
+              title: const Text('GitHub 集成'),
+              subtitle: const Text('安全保存 Personal Access Token，供 Agent 文件工具使用'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const GitHubSettingsPage()),
               ),
             ),
           ),

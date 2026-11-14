@@ -97,6 +97,9 @@ class AppDatabase {
     if (oldVersion < 3) {
       db.execute("ALTER TABLE providers ADD COLUMN model_parameters TEXT DEFAULT '{}'");
     }
+    if (oldVersion < 4) {
+      db.execute("ALTER TABLE chat_sessions ADD COLUMN bound_context_ids TEXT DEFAULT '[]'");
+    }
   }
 
   /// Closes the underlying connection. Safe to call once.

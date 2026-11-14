@@ -6,7 +6,7 @@ AGPL-3.0 而被重新许可。
 
 ## 审查结论
 
-- `pubspec.lock` 当前共列出 97 个包；未发现 GPL、LGPL 或 AGPL 第三方包。
+- `pubspec.lock` 当前锁定的全部包；未发现 GPL、LGPL 或 AGPL 第三方包。
 - 主要许可证为 MIT、BSD-3-Clause、Apache-2.0；SQLite 本体为 Public Domain。
 - 没有复制第三方 Dart/Flutter 源码；Agent、DAO、UI、tokenizer 与任务逻辑均为项目实现。
 - `flutter_highlight` 未加入：其当前 pub 版本 SDK 约束为 `<3.0.0`，与 Dart 3.13 不兼容；没有将不可解析依赖写入项目。
