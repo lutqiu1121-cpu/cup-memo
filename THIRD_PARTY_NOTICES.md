@@ -18,7 +18,8 @@ AGPL-3.0 而被重新许可。
 | --- | --- | --- | --- |
 | `crypto` `3.0.8` | [https://github.com/dart-lang/core/tree/main/pkgs/crypto](https://github.com/dart-lang/core/tree/main/pkgs/crypto) | BSD-3-Clause | content_hash SHA-256 |
 | `cupertino_icons` `1.0.9` | [https://github.com/flutter/packages/tree/main/third_party/packages/cupertino_icons](https://github.com/flutter/packages/tree/main/third_party/packages/cupertino_icons) | MIT | 图标依赖 |
-| `dart_agent_core` `2.1.9` | [https://github.com/memex-lab/dart_agent_core](https://github.com/memex-lab/dart_agent_core) | MIT | 真实 Agent、流式事件与工具调用 |
+| `dartantic_ai` `3.4.2` | [https://pub.dev/packages/dartantic_ai](https://pub.dev/packages/dartantic_ai) | MIT | Agent、流式输出、思考与工具调用；底层依赖 openai_dart |
+| `openai_dart` `7.0.0` | [https://pub.dev/packages/openai_dart](https://pub.dev/packages/openai_dart) | MIT | OpenAI-compatible API 与 ApiException 防御 |
 | `dio` `5.11.1` | [https://github.com/cfug/dio/blob/main/dio](https://github.com/cfug/dio/blob/main/dio) | MIT | HTTP 客户端（Agent 内部也使用） |
 | `flutter` `0.0.0` | [https://github.com/flutter/flutter](https://github.com/flutter/flutter) | BSD-3-Clause | Flutter SDK |
 | `flutter_colorpicker` `1.1.0` | [https://github.com/mchome/flutter_colorpicker](https://github.com/mchome/flutter_colorpicker) | MIT | 颜色选择器 |
@@ -59,7 +60,7 @@ AGPL-3.0 而被重新许可。
 | `crypto` | `3.0.8` | [https://github.com/dart-lang/core/tree/main/pkgs/crypto](https://github.com/dart-lang/core/tree/main/pkgs/crypto) | BSD-3-Clause | content_hash SHA-256 |
 | `cupertino_icons` | `1.0.9` | [https://github.com/flutter/packages/tree/main/third_party/packages/cupertino_icons](https://github.com/flutter/packages/tree/main/third_party/packages/cupertino_icons) | MIT | 图标依赖 |
 | `cupertino_ui` | `1.1.6` | [https://github.com/flutter/packages/tree/main/packages/cupertino_ui](https://github.com/flutter/packages/tree/main/packages/cupertino_ui) | BSD-3-Clause | Transitive dependency / platform support |
-| `dart_agent_core` | `2.1.9` | [https://github.com/memex-lab/dart_agent_core](https://github.com/memex-lab/dart_agent_core) | MIT | 真实 Agent、流式事件与工具调用 |
+| `dartantic_ai` | `3.4.2` | [https://pub.dev/packages/dartantic_ai](https://pub.dev/packages/dartantic_ai) | MIT | Agent、流式输出、思考与工具调用 |
 | `dio` | `5.11.1` | [https://github.com/cfug/dio/blob/main/dio](https://github.com/cfug/dio/blob/main/dio) | MIT | HTTP 客户端（Agent 内部也使用） |
 | `dio_web_adapter` | `2.2.2` | [https://github.com/cfug/dio/blob/main/plugins/web_adapter](https://github.com/cfug/dio/blob/main/plugins/web_adapter) | MIT | Transitive dependency / platform support |
 | `fake_async` | `1.3.3` | [https://github.com/dart-lang/test/tree/master/pkgs/fake_async](https://github.com/dart-lang/test/tree/master/pkgs/fake_async) | Apache-2.0 | Transitive dependency / platform support |
@@ -153,7 +154,7 @@ AGPL-3.0 而被重新许可。
 
 ## 参考与复制情况
 
-- 没有复制 flutter_riverpod、Flutter Material、Dio、SQLite 或 dart_agent_core 源码。
+- 没有复制 flutter_riverpod、Flutter Material、Dio、SQLite 或 dartantic_ai 源码。
 - Agent、工具、搜索、动态记忆、代码块复制、DAO 与 UI 均为本项目代码组合。
 - App 图标使用项目所有者提供的像素画素材。
 

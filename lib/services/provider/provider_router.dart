@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
-import 'package:dart_agent_core/dart_agent_core.dart';
+import 'package:dartantic_ai/dartantic_ai.dart' as da;
+import 'package:http/http.dart' as http;
+import 'package:openai_dart/openai_dart.dart' as openai;
 
-import '../../models/chat_message.dart';
+import '../../models/chat_message.dart' as memo;
 import 'provider_config.dart';
 
 class AgentStreamChunk {
@@ -12,206 +14,144 @@ class AgentStreamChunk {
   final String reasoning;
 }
 
-/// Result of one completed assistant response.
 class ChatCompletion {
-  const ChatCompletion({
-    required this.content,
-    this.model = '',
-    this.promptTokens = 0,
-    this.completionTokens = 0,
-  });
-
+  const ChatCompletion({required this.content, this.model = '', this.promptTokens = 0, this.completionTokens = 0});
   final String content;
   final String model;
   final int promptTokens;
   final int completionTokens;
 }
 
-/// A provider client with both one-shot and streaming APIs.
+/// Converts unsafe HTML/WAF responses into a JSON 502 response. Dartantic's
+/// SSE parser otherwise ignores a successful text/html response silently.
+class WafGuardClient extends http.BaseClient {
+  WafGuardClient(this._inner);
+  final http.Client _inner;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final http.StreamedResponse response = await _inner.send(request);
+    final String contentType = (response.headers['content-type'] ?? '').toLowerCase();
+    final bool badStatus = response.statusCode < 200 || response.statusCode >= 300;
+    final bool allowed = contentType.contains('json') || contentType.contains('event-stream');
+    if (badStatus || contentType.contains('text/html') || !allowed) {
+      await response.stream.drain<void>();
+      final String body = jsonEncode(<String, dynamic>{'error': <String, dynamic>{'message': '请求被防火墙拦截', 'type': 'waf_blocked'}});
+      return http.StreamedResponse(Stream<List<int>>.value(utf8.encode(body)), 502, headers: const <String, String>{'content-type': 'application/json'}, request: response.request, reasonPhrase: 'WAF Guard');
+    }
+    return response;
+  }
+
+  @override
+  void close() => _inner.close();
+}
+
+class GuardedOpenAIProvider extends da.OpenAIProvider {
+  GuardedOpenAIProvider({required http.Client client, super.apiKey, super.baseUrl, super.apiKeyName, super.headers, super.name, super.displayName}) : _client = client;
+  final http.Client _client;
+
+  @override
+  da.ChatModel<da.OpenAIChatOptions> createChatModel({
+    String? name,
+    List<da.Tool>? tools,
+    double? temperature,
+    bool enableThinking = false,
+    da.OpenAIChatOptions? options,
+  }) {
+    if (enableThinking) {
+      throw UnsupportedError('OpenAI Chat Completions 不支持 thinking');
+    }
+    validateApiKeyPresence();
+    return da.OpenAIChatModel(
+      name: name ?? defaultModelNames[da.ModelKind.chat]!,
+      tools: tools,
+      temperature: temperature,
+      apiKey: apiKey,
+      baseUrl: baseUrl ?? da.OpenAIProvider.defaultBaseUrl,
+      headers: headers,
+      client: _client,
+    );
+  }
+}
+
 abstract class ProviderClient {
   ProviderConfig get config;
-
-  Future<ChatCompletion> sendMessage(
-    List<ChatMessage> messages, {
-    String? model,
-    List<Tool>? tools,
-    List<String> systemPrompts = const <String>[],
-  });
-
-  Stream<AgentStreamChunk> streamMessage(
-    List<ChatMessage> messages, {
-    String? model,
-    List<Tool>? tools,
-    List<String> systemPrompts = const <String>[],
-  });
+  Future<ChatCompletion> sendMessage(List<memo.ChatMessage> messages, {String? model, List<da.Tool>? tools, List<String> systemPrompts = const <String>[]});
+  Stream<AgentStreamChunk> streamMessage(List<memo.ChatMessage> messages, {String? model, List<da.Tool>? tools, List<String> systemPrompts = const <String>[]});
 }
 
-/// Real OpenAI-compatible client backed by dart_agent_core's OpenAIClient.
 class AgentProviderClient implements ProviderClient {
-  AgentProviderClient({
-    required this.config,
-    required this._apiKey,
-  });
-
+  AgentProviderClient({required this.config, required this.apiKey});
   @override
   final ProviderConfig config;
-  final String _apiKey;
+  final String? apiKey;
 
-  OpenAIClient _client() {
-    final Map<String, dynamic> parameters = config.modelParameters;
-    final Map<String, dynamic> payloadPreview = <String, dynamic>{
-      'model': parameters['model'] ?? config.defaultModel,
-      'temperature': parameters['temperature'],
-      'max_completion_tokens': parameters['max_tokens'],
-      'extra': parameters,
-    };
-    // Keep the actual request transparent during debugging without ever logging the API key.
-    debugPrint('ProviderRouter request template: ${jsonEncode(payloadPreview)}');
-    return OpenAIClient(
-      apiKey: _apiKey,
-      baseUrl: config.baseUrl,
+  da.Agent _agent({String? model, List<da.Tool>? tools}) {
+    final bool ollama = config.kind == ProviderKind.ollama;
+    final da.OpenAIProvider provider = GuardedOpenAIProvider(
+      client: WafGuardClient(http.Client()),
+      apiKey: ollama ? null : apiKey,
+      apiKeyName: ollama ? null : 'OPENAI_API_KEY',
+      baseUrl: Uri.parse(config.baseUrl),
+      headers: config.extraHeaders,
+      name: 'cup_memo_${config.id}',
+      defaultModelNames: <da.ModelKind, String>{da.ModelKind.chat: model ?? config.defaultModel},
     );
+    return da.Agent.forProvider(provider, chatModelName: model, tools: tools);
   }
 
-  ModelConfig _model(String? model) {
-    final Map<String, dynamic> parameters = config.modelParameters;
-    final Map<String, dynamic> extra = <String, dynamic>{};
-    final bool thinking = parameters['thinking_enabled'] == true;
-    final String? level = parameters['thinking_level']?.toString();
-    final int? budget = (parameters['thinking_budget'] as num?)?.toInt();
-    if (thinking && level != null && level.isNotEmpty) {
-      extra['reasoning_effort'] = level;
+  List<da.ChatMessage> _history(List<memo.ChatMessage> messages, List<String> prompts) {
+    final List<da.ChatMessage> result = <da.ChatMessage>[...prompts.map(da.ChatMessage.system)];
+    for (final memo.ChatMessage message in messages.take(messages.length - 1)) {
+      if (message.role == memo.ChatRole.user) result.add(da.ChatMessage.user(message.content));
+      if (message.role == memo.ChatRole.assistant) result.add(da.ChatMessage.model(message.content));
     }
-    if (thinking && budget != null && config.kind == ProviderKind.anthropic) {
-      extra['thinking'] = <String, dynamic>{'type': 'enabled', 'budget_tokens': budget};
-    }
-    return ModelConfig(
-      model: model ?? config.defaultModel,
-      temperature: (parameters['temperature'] as num?)?.toDouble(),
-      maxTokens: (parameters['max_tokens'] as num?)?.toInt(),
-      extra: extra.isEmpty ? null : extra,
-    );
+    return result;
   }
 
-  List<LLMMessage> _messages(List<ChatMessage> messages) {
-    return messages
-        .map((ChatMessage message) {
-          switch (message.role) {
-            case ChatRole.user:
-              return UserMessage.text(message.content);
-            case ChatRole.system:
-              return SystemMessage(message.content);
-            case ChatRole.assistant:
-              return ModelMessage(
-                model: config.defaultModel,
-                textOutput: message.content,
-              );
-          }
-        })
-        .toList(growable: false);
+  String _prompt(List<memo.ChatMessage> messages) => messages.isEmpty ? '' : messages.last.content;
+
+  @override
+  Future<ChatCompletion> sendMessage(List<memo.ChatMessage> messages, {String? model, List<da.Tool>? tools, List<String> systemPrompts = const <String>[]}) async {
+    final da.ChatResult<String> result = await _agent(model: model, tools: tools).send(_prompt(messages), history: _history(messages, systemPrompts));
+    return ChatCompletion(content: result.output, model: model ?? config.defaultModel);
   }
 
   @override
-  Future<ChatCompletion> sendMessage(
-    List<ChatMessage> messages, {
-    String? model,
-    List<Tool>? tools,
-    List<String> systemPrompts = const <String>[],
-  }) async {
-    final StatefulAgent agent = StatefulAgent(
-      name: 'cup_memo_${config.id}',
-      client: _client(),
-      tools: tools,
-      modelConfig: _model(model),
-      systemPrompts: systemPrompts,
-      state: AgentState.empty(),
-    );
-    final List<LLMMessage> responses = await agent.run(_messages(messages));
-    final List<ModelMessage> modelResponses =
-        responses.whereType<ModelMessage>().toList(growable: false);
-    final ModelMessage? answer =
-        modelResponses.isEmpty ? null : modelResponses.last;
-    return ChatCompletion(
-      content: answer?.textOutput ?? '',
-      model: model ?? config.defaultModel,
-      promptTokens: answer?.usage?.promptTokens ?? 0,
-      completionTokens: answer?.usage?.completionTokens ?? 0,
-    );
-  }
-
-  @override
-  Stream<AgentStreamChunk> streamMessage(
-    List<ChatMessage> messages, {
-    String? model,
-    List<Tool>? tools,
-    List<String> systemPrompts = const <String>[],
-  }) async* {
-    final StatefulAgent agent = StatefulAgent(
-      name: 'cup_memo_${config.id}',
-      client: _client(),
-      tools: tools,
-      modelConfig: _model(model),
-      systemPrompts: systemPrompts,
-      state: AgentState.empty(),
-    );
-    final Stream<StreamingEvent> stream = agent.runStream(_messages(messages));
-    await for (final StreamingEvent event in stream) {
-      if (event.eventType == StreamingEventType.modelChunkMessage) {
-        final ModelMessage chunk = event.data as ModelMessage;
-        final String? text = chunk.textOutput;
-        final String textValue = text ?? '';
-        final String reasoning = chunk.thought ?? '';
-        if (textValue.isNotEmpty || reasoning.isNotEmpty) {
-          yield AgentStreamChunk(text: textValue, reasoning: reasoning);
+  Stream<AgentStreamChunk> streamMessage(List<memo.ChatMessage> messages, {String? model, List<da.Tool>? tools, List<String> systemPrompts = const <String>[]}) async* {
+    final da.Agent agent = _agent(model: model, tools: tools);
+    int toolRounds = 0;
+    try {
+      await for (final da.ChatResult<String> chunk in agent.sendStream(_prompt(messages), history: _history(messages, systemPrompts))) {
+        toolRounds += chunk.messages.expand((da.ChatMessage message) => message.parts.toolResults).length;
+        if (toolRounds > 8) throw StateError('Agent tool loop exceeded 8 rounds');
+        final String text = chunk.output;
+        final String thinking = chunk.thinking ?? '';
+        if (text.contains('<!DOCTYPE html>') || text.contains('<script') || text.toLowerCase().contains('waf-ce.chaitin.cn')) {
+          throw StateError('请求被防火墙拦截');
         }
+        if (text.isNotEmpty || thinking.isNotEmpty) yield AgentStreamChunk(text: text, reasoning: thinking);
       }
+    } on openai.ApiException {
+      throw StateError('网络请求失败，请稍后重试');
+    } on openai.OpenAIException {
+      throw StateError('网络连接失败，请检查 Provider 配置');
+    } on da.OpenAIRefusalException {
+      throw StateError('模型拒绝了请求');
     }
   }
 }
 
-/// Keeps the old public name while now returning a real client.
 class ProviderRouter {
   const ProviderRouter(this.config, {this.apiKey});
-
   final ProviderConfig config;
   final String? apiKey;
 
   ProviderClient createClient() {
-    final String? key = apiKey;
-    if ((key == null || key.isEmpty) && config.kind != ProviderKind.ollama) {
-      throw StateError('Provider ${config.name} 没有可用的 API Key');
-    }
-    return AgentProviderClient(
-      config: config,
-      apiKey: key == null || key.isEmpty ? 'ollama' : key,
-    );
+    if ((apiKey == null || apiKey!.isEmpty) && config.kind != ProviderKind.ollama) throw StateError('Provider ${config.name} 没有可用的 API Key');
+    return AgentProviderClient(config: config, apiKey: apiKey);
   }
 
-  Future<ChatCompletion> sendMessage(
-    List<ChatMessage> messages, {
-    String? model,
-    List<Tool>? tools,
-    List<String> systemPrompts = const <String>[],
-  }) {
-    return createClient().sendMessage(
-      messages,
-      model: model ?? config.defaultModel,
-      tools: tools,
-      systemPrompts: systemPrompts,
-    );
-  }
-
-  Stream<AgentStreamChunk> streamMessage(
-    List<ChatMessage> messages, {
-    String? model,
-    List<Tool>? tools,
-    List<String> systemPrompts = const <String>[],
-  }) {
-    return createClient().streamMessage(
-      messages,
-      model: model ?? config.defaultModel,
-      tools: tools,
-      systemPrompts: systemPrompts,
-    );
-  }
+  Future<ChatCompletion> sendMessage(List<memo.ChatMessage> messages, {String? model, List<da.Tool>? tools, List<String> systemPrompts = const <String>[]}) => createClient().sendMessage(messages, model: model ?? config.defaultModel, tools: tools, systemPrompts: systemPrompts);
+  Stream<AgentStreamChunk> streamMessage(List<memo.ChatMessage> messages, {String? model, List<da.Tool>? tools, List<String> systemPrompts = const <String>[]}) => createClient().streamMessage(messages, model: model ?? config.defaultModel, tools: tools, systemPrompts: systemPrompts);
 }

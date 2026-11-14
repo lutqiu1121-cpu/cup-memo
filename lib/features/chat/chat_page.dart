@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:dart_agent_core/dart_agent_core.dart';
 import 'package:flutter/material.dart';
+
 
 import '../../app.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,6 +16,8 @@ import '../../services/entry_service.dart';
 import '../../services/provider/provider_config.dart';
 import '../../services/provider/model_capabilities.dart';
 import '../../services/provider/provider_router.dart';
+import 'package:dartantic_ai/dartantic_ai.dart' as da;
+
 import '../settings/provider_management_page.dart';
 
 /// Tab 3 — real streaming chat with tool-assisted local memory.
@@ -130,88 +132,41 @@ class ChatPageState extends ConsumerState<ChatPage> {
     return prompts;
   }
 
-  List<Tool> _tools() {
-    return <Tool>[
-      Tool(
-        name: 'search_entries',
-        description: 'Search local Cup Memo entries using the CJK-aware FTS5 index.',
-        parameterMode: ToolParameterMode.object,
-        parameters: <String, dynamic>{
-          'type': 'object',
-          'properties': <String, dynamic>{
-            'query': <String, dynamic>{'type': 'string'},
-          },
-          'required': <String>['query'],
-        },
-        executable: (Map<String, dynamic> args) async {
-          final EntryService? service = ref.read(entryServiceProvider);
-          if (service == null) return <String>['Database unavailable'];
-          final String query = args['query']?.toString() ?? '';
-          final List<Entry> entries = await service.search(query);
-          return entries
-              .take(10)
-              .map((Entry entry) => <String, String>{
-                    'id': entry.id,
-                    'title': entry.title,
-                    'category': entry.category,
-                  })
-              .toList(growable: false);
-        },
-      ),
-      Tool(
-        name: 'create_entry',
-        description: 'Create a local Cup Memo entry when the user explicitly asks to remember something.',
-        parameterMode: ToolParameterMode.object,
-        parameters: <String, dynamic>{
-          'type': 'object',
-          'properties': <String, dynamic>{
-            'title': <String, dynamic>{'type': 'string'},
-            'body': <String, dynamic>{'type': 'string'},
-            'category': <String, dynamic>{'type': 'string'},
-          },
-          'required': <String>['title', 'body'],
-        },
-        executable: (Map<String, dynamic> args) async {
+  List<da.Tool> _tools() {
+    return <da.Tool>[
+      da.Tool<Map<String, dynamic>>(
+        name: 'search_entries', description: 'Search local Cup Memo entries.',
+        inputSchema: da.Schema.fromMap({'type': 'object', 'properties': {'query': {'type': 'string'}}, 'required': ['query']}),
+        onCall: (Map<String, dynamic> args) async {
           final EntryService? service = ref.read(entryServiceProvider);
           if (service == null) return 'Database unavailable';
-          final result = await service.create(
-            title: args['title']?.toString() ?? 'Untitled',
-            body: args['body']?.toString() ?? '',
-            category: args['category']?.toString() ?? 'AI',
-            tags: const <String>['AI'],
-            isAiContext: false,
-          );
+          final List<Entry> entries = await service.search(args['query']?.toString() ?? '');
+          return entries.take(10).map((Entry e) => {'id': e.id, 'title': e.title, 'category': e.category}).toList();
+        },
+      ),
+      da.Tool<Map<String, dynamic>>(
+        name: 'create_entry', description: 'Create a local memo entry when explicitly requested.',
+        inputSchema: da.Schema.fromMap({'type': 'object', 'properties': {'title': {'type': 'string'}, 'body': {'type': 'string'}, 'category': {'type': 'string'}}, 'required': ['title', 'body']}),
+        onCall: (Map<String, dynamic> args) async {
+          final EntryService? service = ref.read(entryServiceProvider);
+          if (service == null) return 'Database unavailable';
+          final result = await service.create(title: args['title']?.toString() ?? 'Untitled', body: args['body']?.toString() ?? '', category: args['category']?.toString() ?? 'AI', tags: const ['AI'], isAiContext: false);
           return 'Entry ${result.entryId} created (${result.outcome.name})';
         },
       ),
-      Tool(
-        name: 'add_task',
-        description: 'Add a current task for the user.',
-        parameterMode: ToolParameterMode.object,
-        parameters: <String, dynamic>{'type': 'object', 'properties': <String, dynamic>{'title': <String, dynamic>{'type': 'string'}, 'detail': <String, dynamic>{'type': 'string'}}, 'required': <String>['title']},
-        executable: (Map<String, dynamic> args) {
-          final dao = ref.read(databaseProvider)?.taskDao;
-          if (dao == null) return 'Database unavailable';
-          return dao.addCurrentTask(title: args['title']?.toString() ?? 'Untitled', detail: args['detail']?.toString() ?? '');
-        },
+      da.Tool<Map<String, dynamic>>(
+        name: 'add_task', description: 'Add a current task.',
+        inputSchema: da.Schema.fromMap({'type': 'object', 'properties': {'title': {'type': 'string'}, 'detail': {'type': 'string'}}, 'required': ['title']}),
+        onCall: (Map<String, dynamic> args) => ref.read(databaseProvider)?.taskDao.addCurrentTask(title: args['title']?.toString() ?? 'Untitled', detail: args['detail']?.toString() ?? '') ?? 'Database unavailable',
       ),
-      Tool(
-        name: 'complete_task',
-        description: 'Complete a current task by id.',
-        parameterMode: ToolParameterMode.object,
-        parameters: <String, dynamic>{'type': 'object', 'properties': <String, dynamic>{'task_id': <String, dynamic>{'type': 'string'}}, 'required': <String>['task_id']},
-        executable: (Map<String, dynamic> args) => ref.read(databaseProvider)?.taskDao.completeTask(args['task_id']?.toString() ?? '') ?? false,
+      da.Tool<Map<String, dynamic>>(
+        name: 'complete_task', description: 'Complete a task by id.',
+        inputSchema: da.Schema.fromMap({'type': 'object', 'properties': {'task_id': {'type': 'string'}}, 'required': ['task_id']}),
+        onCall: (Map<String, dynamic> args) => ref.read(databaseProvider)?.taskDao.completeTask(args['task_id']?.toString() ?? '') ?? false,
       ),
-      Tool(
-        name: 'list_tasks',
-        description: 'List current and recently completed tasks.',
-        parameterMode: ToolParameterMode.object,
-        parameters: <String, dynamic>{'type': 'object', 'properties': <String, dynamic>{}},
-        executable: (Map<String, dynamic> args) {
-          final dao = ref.read(databaseProvider)?.taskDao;
-          if (dao == null) return 'Database unavailable';
-          return <String, dynamic>{'current': dao.listCurrent().map((t) => <String, String>{'id': t.id, 'title': t.title}).toList(), 'history': dao.listHistory().take(10).map((t) => <String, String>{'id': t.id, 'title': t.title}).toList()};
-        },
+      da.Tool<Map<String, dynamic>>(
+        name: 'list_tasks', description: 'List current and recently completed tasks.',
+        onCall: (_) { final dao = ref.read(databaseProvider)?.taskDao; return dao == null ? 'Database unavailable' : {'current': dao.listCurrent().map((t) => {'id': t.id, 'title': t.title}).toList(), 'history': dao.listHistory().take(10).map((t) => {'id': t.id, 'title': t.title}).toList()}; },
       ),
     ];
   }

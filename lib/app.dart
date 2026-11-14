@@ -19,14 +19,7 @@ class CupMemoApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ThemeState theme = ref.watch(themeControllerProvider);
-    return MaterialApp(
-      title: 'Cup Memo', debugShowCheckedModeBanner: false,
-      theme: AppTheme.build(theme.seedColor, brightness: theme.brightness, backgroundColor: theme.backgroundHex == null ? null : AppColors.tryParseHex(theme.backgroundHex!)),
-      darkTheme: AppTheme.build(theme.seedColor, brightness: Brightness.dark, backgroundColor: theme.backgroundHex == null ? const Color(0xFF121212) : AppColors.tryParseHex(theme.backgroundHex!)),
-      themeMode: theme.systemMode ? ThemeMode.system : (theme.brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light),
-      builder: (BuildContext context, Widget? child) => AnnotatedRegion<SystemUiOverlayStyle>(value: appOverlayStyle, child: child ?? const SizedBox.shrink()),
-      home: const HomeShell(),
-    );
+    return MaterialApp(title: 'Cup Memo', debugShowCheckedModeBanner: false, theme: AppTheme.build(theme.seedColor, brightness: theme.brightness, backgroundColor: theme.backgroundHex == null ? null : AppColors.tryParseHex(theme.backgroundHex!)), darkTheme: AppTheme.build(theme.seedColor, brightness: Brightness.dark, backgroundColor: theme.backgroundHex == null ? const Color(0xFF121212) : AppColors.tryParseHex(theme.backgroundHex!)), themeMode: theme.systemMode ? ThemeMode.system : (theme.brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light), builder: (BuildContext context, Widget? child) => AnnotatedRegion<SystemUiOverlayStyle>(value: appOverlayStyle, child: child ?? const SizedBox.shrink()), home: const HomeShell());
   }
 }
 
@@ -47,31 +40,23 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    final Color footerColor = Theme.of(context).colorScheme.onSurfaceVariant;
     return Scaffold(
       key: appShellScaffoldKey,
       drawer: Drawer(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        child: Consumer(builder: (BuildContext context, WidgetRef ref, Widget? _) {
-          final Widget content = SafeArea(child: ListView(
-            padding: const EdgeInsets.fromLTRB(8, 20, 8, 20),
-            children: <Widget>[
-              const Padding(padding: EdgeInsets.fromLTRB(16, 0, 16, 16), child: Text('Cup Memo', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700))),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: FilledButton.icon(
-                  onPressed: () { Navigator.pop(context); setState(() => _index = 2); _chatKey.currentState?.startNewSession(); },
-                  icon: const Icon(Icons.add_comment_outlined),
-                  label: const Align(alignment: Alignment.centerLeft, child: Text('新建对话')),
-                  style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14)),
-                ),
-              ),
-              const Divider(),
-              for (var i = 0; i < _labels.length; i++)
-                ListTile(selectedTileColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.14), selectedColor: Theme.of(context).colorScheme.primary, leading: Icon(_icons[i]), title: Text(_labels[i]), selected: _index == i, onTap: () => _select(i)),
-            ],
-          ));
-          return content;
-        }),
+        child: SafeArea(child: Column(children: <Widget>[
+          Expanded(child: ListView(padding: const EdgeInsets.fromLTRB(8, 20, 8, 20), children: <Widget>[
+            const Padding(padding: EdgeInsets.fromLTRB(16, 0, 16, 16), child: Text('Cup Memo', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700))),
+            const Divider(),
+            for (var i = 0; i < _labels.length; i++)
+              ListTile(selectedTileColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.14), selectedColor: Theme.of(context).colorScheme.primary, leading: Icon(_icons[i]), title: Text(_labels[i]), selected: _index == i, onTap: () => _select(i)),
+          ])),
+          Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 18), child: Column(children: <Widget>[
+            Text('Cup Memo v0.1.0', textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: footerColor)),
+            Text('© 2026 lutqiu1121-cpu · AGPL-3.0', textAlign: TextAlign.center, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: footerColor)),
+          ])),
+        ])),
       ),
       body: IndexedStack(index: _index, children: _pages),
     );
