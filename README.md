@@ -34,7 +34,7 @@
 | --- | --- | --- |
 | 底部导航（备忘录 / 搜索 / 会话 / 任务 / 设置） | ✅ | 5 个 tab，切换正常，占位空状态 |
 | 主题系统（分类预设色板 + 自定义 hex + 持久化） | ✅ | 背景固定米白 `#FAF7F0`，卡片白色圆角 16 |
-| App 图标（原创 SVG 几何稿 / 自适应图标） | ✅ | `assets/icon/app_icon.png`，Android 13 自适应背景/透明前景 |
+| App 图标（32×32 像素画 / 自适应图标） | ✅ | 4px padding + 最近邻放大，inset 12% |
 | Provider 管理（增删改、设默认、预设） | ✅ | 列表 / 添加 / 编辑 / 删除 / 设为默认，API Key 进安全存储 |
 | 会话页 Provider 切换 | ✅ | 顶部显示当前 Provider，点击切换，仅影响后续消息 |
 | 数据库建表（含 FTS5） | ✅ | schema version 1，`onUpgrade` 空实现 + 注释 |
@@ -311,19 +311,22 @@ class PresetTheme {
 
 ## App 图标
 
-- 最终源图：`assets/icon/app_icon.svg`（本项目原创 2048×2048 几何稿）；`app_icon.png` 是由该 SVG 几何参数生成的 PNG，不再依赖外部图片素材。
-- 配置：`image_path` 指向 `assets/icon/app_icon.png`；同一原创图形作为 adaptive background，
-  透明前景层负责 Android 13 自适应结构，避免背景方块接缝。
-- 配置在 `pubspec.yaml` 的 `flutter_launcher_icons` 段，重新生成：
+- 素材：确认稿为 32×32 像素画（米黄底 `#F2CD9D`）。
+- 加工流程（`tool/process_app_icon.py`，可复现）：
 
   ```bash
-  flutter pub run flutter_launcher_icons
+  python3 tool/process_app_icon.py <32x32.png>
+  # 1. 取四边众数色作为背景（#F2CD9D）
+  # 2. 四边各补 4px 同色 padding：32×32 -> 40×40
+  # 3. Nearest Neighbor 放大到 1024×1024（断言不产生任何新颜色）
+  # 4. 写入 assets/icon/app_icon.png
   ```
 
-  会写入 `mipmap-*dpi/ic_launcher.png`、`mipmap-anydpi-v26/ic_launcher.xml`
-  （自适应：背景图使用原创 `app_icon.png`，透明前景 inset 0%）与 `values/colors.xml`。
-- `tool/render_app_icon.py` 是 PNG 烘焙脚本；它只使用仓库内的 SVG 几何与颜色参数，
-  不读取外部图片。阴影用三层半透明椭圆实现，不依赖 SVG filter/gradient。
+- 生成 Android 图标：`flutter pub run flutter_launcher_icons`，配置在 `pubspec.yaml`：
+  `image_path` 指向 `app_icon.png`；`adaptive_icon_background: '#F2CD9D'`（与画面底色同色，
+  无缝）；`adaptive_icon_foreground` 用同一张图，`inset: 12%`。
+- `tool/snap_icon_palette.py`：`flutter_launcher_icons` 的缩放会把 8 色调色板混成约 80 色，
+  该脚本把生成的多密度 PNG 逐像素吸附回源调色板并压实 alpha，保证像素边缘锐利。
 
 ## 条目与索引（EntryDao）
 
