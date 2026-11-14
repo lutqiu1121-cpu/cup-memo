@@ -52,6 +52,15 @@ class ProviderPresets {
     note: '国内 OpenAI 兼容网关',
   );
 
+  static const ProviderPreset anthropic = ProviderPreset(
+    id: 'anthropic_official',
+    label: 'Anthropic Messages',
+    kind: ProviderKind.anthropic,
+    baseUrl: 'https://api.anthropic.com',
+    defaultModel: 'claude-3-7-sonnet-latest',
+    note: 'Anthropic Messages API，模型列表使用 /v1/models、x-api-key 与 anthropic-version',
+  );
+
   static const ProviderPreset ollama = ProviderPreset(
     id: 'ollama_local',
     label: 'Ollama 本地',
@@ -75,6 +84,7 @@ class ProviderPresets {
     deepSeek,
     openRouter,
     siliconFlow,
+    anthropic,
     ollama,
     custom,
   ];

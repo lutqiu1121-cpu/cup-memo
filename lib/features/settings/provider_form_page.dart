@@ -109,21 +109,58 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请先填写 baseUrl')));
       return;
     }
+    final String key = _apiKey.text.trim();
+    if (key.isEmpty && _kind != ProviderKind.ollama) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请先填写 API Key')));
+      return;
+    }
+
     setState(() => _loadingModels = true);
     try {
-      final response = await Dio().get<Map<String, dynamic>>(
-        '$base/models',
-        options: Options(headers: _apiKey.text.trim().isEmpty ? null : <String, String>{'Authorization': 'Bearer ${_apiKey.text.trim()}'}),
+      final Map<String, String> headers = <String, String>{
+        ...ProviderConfig.parseHeadersText(_headers.text),
+      };
+      String modelsUrl;
+      if (_kind == ProviderKind.anthropic) {
+        modelsUrl = base.endsWith('/v1') ? '$base/models' : '$base/v1/models';
+        headers['x-api-key'] = key;
+        headers['anthropic-version'] ??= '2023-06-01';
+        headers.remove('Authorization');
+      } else {
+        modelsUrl = '$base/models';
+        if (key.isNotEmpty) headers['Authorization'] = 'Bearer $key';
+      }
+
+      final response = await Dio().get<dynamic>(
+        modelsUrl,
+        options: Options(
+          headers: headers.isEmpty ? null : headers,
+          validateStatus: (int? status) => status != null && status >= 200 && status < 300,
+        ),
       );
-      final data = response.data?['data'];
-      final models = data is List
-          ? data.map((Object? value) => value is Map ? value['id']?.toString() : value?.toString()).whereType<String>().where((String value) => value.isNotEmpty).toList()
+      final dynamic raw = response.data is Map ? (response.data as Map)['data'] : response.data;
+      final List<String> models = raw is List
+          ? raw.map((Object? value) {
+              if (value is Map) return (value['id'] ?? value['name'])?.toString();
+              return value?.toString();
+            }).whereType<String>().where((String value) => value.isNotEmpty).toList()
           : const <String>[];
       if (!mounted) return;
-      setState(() { _models = models; _loadingModels = false; });
-      if (models.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('接口未返回可用模型')));
-      }
+      setState(() {
+        _models = models;
+        _loadingModels = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(models.isEmpty ? '接口未返回可用模型' : '已获取 ${models.length} 个模型')),
+      );
+    } on DioException catch (error) {
+      if (!mounted) return;
+      setState(() => _loadingModels = false);
+      final int? status = error.response?.statusCode;
+      final String detail = error.response?.data?.toString() ?? error.message ?? error.type.name;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('获取模型失败${status == null ? '' : ' [$status]'}：$detail')),
+      );
     } catch (error) {
       if (!mounted) return;
       setState(() => _loadingModels = false);
