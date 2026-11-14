@@ -45,6 +45,9 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
   bool _thinking = false;
   String _thinkingLevel = 'medium';
   double _thinkingBudget = 4096;
+  bool _manualContext = false;
+  bool _manualThinking = false;
+  int _contextOverride = 8192;
 
   @override
   void initState() {
@@ -62,6 +65,10 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
       _thinking = existing.modelParameters['thinking_enabled'] == true;
       _thinkingLevel = existing.modelParameters['thinking_level']?.toString() ?? 'medium';
       _thinkingBudget = (existing.modelParameters['thinking_budget'] as num?)?.toDouble() ?? 4096;
+      _manualContext = existing.modelParameters['context_override'] is num;
+      _contextOverride = (existing.modelParameters['context_override'] as num?)?.toInt() ?? 8192;
+      _manualThinking = existing.modelParameters['thinking_override'] is bool;
+      if (_manualThinking) _thinking = existing.modelParameters['thinking_override'] == true;
       _preset = ProviderPresets.all.firstWhere(
         (ProviderPreset preset) => preset.kind == existing.kind &&
             preset.baseUrl == existing.baseUrl,
@@ -209,6 +216,8 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
         'temperature': _temperature,
         'max_tokens': _maxTokens,
         'context_tokens': _capabilities.maxContextTokens,
+        if (_manualContext) 'context_override': _contextOverride,
+        if (_manualThinking) 'thinking_override': _thinking,
         'thinking_enabled': _thinking,
         if (_thinking) 'thinking_level': _thinkingLevel,
         if (_thinking) 'thinking_budget': _thinkingBudget.toInt(),
@@ -369,9 +378,12 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
             Text('Temperature：${_temperature.toStringAsFixed(1)}'),
             Slider(value: _temperature, min: 0, max: 2, divisions: 20, onChanged: (double value) => setState(() => _temperature = value)),
             TextField(controller: TextEditingController(text: _maxTokens.toString()), keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Max Tokens'), onSubmitted: (String value) { final parsed = int.tryParse(value); if (parsed != null) setState(() => _maxTokens = parsed.clamp(1, _capabilities.maxContextTokens)); }),
-            Text('最大上下文：${_capabilities.maxContextTokens} tokens'),
-            Slider(value: _capabilities.maxContextTokens.toDouble().clamp(1024, 1000000), min: 1024, max: 1000000, divisions: 100, onChanged: (double value) => setState(() => _capabilities = _capabilities.copyWith(maxContextTokens: value.toInt()))),
-            SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('开启深度思考'), subtitle: Text(_capabilities.supportsThinking ? '当前模型支持' : '当前模型不支持'), value: _thinking, onChanged: _capabilities.supportsThinking ? (bool value) => setState(() => _thinking = value) : null),
+            SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('手动覆盖最大上下文'), subtitle: Text(_manualContext ? '使用自定义上限 $_contextOverride tokens' : '使用模型能力档案 ${_capabilities.maxContextTokens} tokens'), value: _manualContext, onChanged: (bool value) => setState(() => _manualContext = value)),
+            if (_manualContext)
+              TextField(keyboardType: TextInputType.number, controller: TextEditingController(text: _contextOverride.toString()), decoration: const InputDecoration(labelText: '最大上下文 tokens'), onSubmitted: (String value) { final parsed = int.tryParse(value); if (parsed != null) setState(() => _contextOverride = parsed.clamp(1024, 1000000)); }),
+            Text('模型上下文档案：${_capabilities.maxContextTokens} tokens'),
+            Slider(value: (_manualContext ? _contextOverride : _capabilities.maxContextTokens).toDouble().clamp(1024, 1000000), min: 1024, max: 1000000, divisions: 100, onChanged: (double value) => setState(() { _contextOverride = value.toInt(); _manualContext = true; })),
+            SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('开启深度思考'), subtitle: Text(_capabilities.supportsThinking ? '当前模型支持' : '当前模型未检测到，可手动覆盖'), value: _thinking, onChanged: (bool value) => setState(() { _thinking = value; _manualThinking = true; })),
             if (_thinking && _capabilities.supportsThinkingLevels)
               DropdownButtonFormField<String>(initialValue: _capabilities.thinkingLevels.contains(_thinkingLevel) ? _thinkingLevel : _capabilities.thinkingLevels.first, decoration: const InputDecoration(labelText: '思考等级'), items: _capabilities.thinkingLevels.map((String value) => DropdownMenuItem<String>(value: value, child: Text(value))).toList(), onChanged: (String? value) { if (value != null) setState(() => _thinkingLevel = value); }),
             if (_thinking && _capabilities.supportsThinkingBudget) ...<Widget>[

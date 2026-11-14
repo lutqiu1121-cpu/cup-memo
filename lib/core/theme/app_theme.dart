@@ -18,13 +18,14 @@ class AppTheme {
   static const double cardRadius = 16;
 
   static ThemeData build(Color seedColor, {Brightness brightness = Brightness.light, Color? backgroundColor}) {
+    final Color surface = brightness == Brightness.dark ? const Color(0xFF1E1E1E) : AppColors.card;
+    final Color foreground = brightness == Brightness.dark ? Colors.white : AppColors.textPrimary;
     final ColorScheme scheme = ColorScheme.fromSeed(
       seedColor: seedColor,
       brightness: brightness,
-    ).copyWith(surface: AppColors.card, onSurface: AppColors.textPrimary);
+    ).copyWith(surface: surface, surfaceContainer: surface, onSurface: foreground);
 
     final ThemeData base = ThemeData(colorScheme: scheme, useMaterial3: true);
-    final Color foreground = brightness == Brightness.dark ? Colors.white : AppColors.textPrimary;
     final TextTheme textTheme = base.textTheme
         .apply(bodyColor: foreground, displayColor: foreground)
         .copyWith(
@@ -41,7 +42,7 @@ class AppTheme {
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
-        foregroundColor: AppColors.textPrimary,
+        foregroundColor: foreground,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
@@ -55,7 +56,7 @@ class AppTheme {
         ),
       ),
       cardTheme: CardThemeData(
-        color: brightness == Brightness.dark ? const Color(0xFF1E1E1E) : AppColors.card,
+        color: surface,
         elevation: 2,
         shadowColor: AppColors.textPrimary.withValues(alpha: 0.08),
         surfaceTintColor: Colors.transparent,
@@ -91,7 +92,7 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.card,
+        fillColor: surface,
         hintStyle: const TextStyle(color: AppColors.textSecondary),
         labelStyle: const TextStyle(color: AppColors.textSecondary),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -109,7 +110,7 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.textPrimary,
+          foregroundColor: foreground,
           side: const BorderSide(color: Color(0xFFE0D9CB)),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
@@ -117,7 +118,7 @@ class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: AppColors.textPrimary,
-        contentTextStyle: const TextStyle(color: AppColors.card),
+        contentTextStyle: TextStyle(color: brightness == Brightness.dark ? Colors.white : AppColors.card),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
@@ -126,9 +127,9 @@ class AppTheme {
         thickness: 1,
         space: 1,
       ),
-      listTileTheme: const ListTileThemeData(
-        iconColor: AppColors.textSecondary,
-        textColor: AppColors.textPrimary,
+      listTileTheme: ListTileThemeData(
+        iconColor: brightness == Brightness.dark ? Colors.white70 : AppColors.textSecondary,
+        textColor: foreground,
       ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: brightness == Brightness.dark ? const Color(0xFF1E1E1E) : AppColors.card,

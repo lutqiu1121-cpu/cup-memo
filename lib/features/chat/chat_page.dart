@@ -34,6 +34,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   String? _sessionId;
   bool _sending = false;
   bool _webSearch = false;
+  bool _toolsEnabled = true;
 
   @override
   void initState() {
@@ -281,10 +282,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     try {
       final List<String> memory = await _memoryPrompts(text);
       final List<ChatMessage> contextRequest = _trimMessages(request, memory, router.config.defaultModel);
-      debugPrint('CupMemo Agent payload: model=${router.config.defaultModel} messages=${contextRequest.length} systemPrompts=${memory.length} tools=${_tools().length}');
+      debugPrint('CupMemo Agent payload: model=${router.config.defaultModel} messages=${contextRequest.length} systemPrompts=${memory.length} tools=${_toolsEnabled ? _tools().length : 0}');
       await for (final AgentStreamChunk chunk in router.streamMessage(
         contextRequest,
-        tools: _tools(),
+        tools: _toolsEnabled ? _tools() : null,
         systemPrompts: memory,
       )) {
         buffer.write(chunk.text);
@@ -444,6 +445,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     ),
                   ),
           ),
+          Padding(padding: const EdgeInsets.fromLTRB(16, 4, 16, 0), child: Row(children: <Widget>[
+            FilterChip(label: const Text('工具调用'), selected: _toolsEnabled, onSelected: (bool value) => setState(() => _toolsEnabled = value)),
+            const SizedBox(width: 8),
+            FilterChip(label: const Text('联网搜索'), selected: _webSearch, onSelected: (bool value) => setState(() => _webSearch = value)),
+          ])),
           _statsBar(active),
           SafeArea(
             top: false,
@@ -508,7 +514,7 @@ class _Bubble extends StatelessWidget {
         decoration: BoxDecoration(
           color: user
               ? theme.colorScheme.primary.withValues(alpha: 0.22)
-              : AppColors.card,
+              : Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(

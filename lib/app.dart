@@ -84,18 +84,24 @@ class _HomeShellState extends State<HomeShell> {
       key: appShellScaffoldKey,
       drawer: Drawer(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        child: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(8, 20, 8, 20),
-            children: <Widget>[
-              const Padding(padding: EdgeInsets.fromLTRB(16, 0, 16, 20), child: Text('Cup Memo', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700))),
-              ListTile(selectedTileColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.14), selectedColor: Theme.of(context).colorScheme.primary, leading: const Icon(Icons.add_comment_outlined), title: const Text('新建对话'), onTap: () { Navigator.pop(context); setState(() => _index = 2); }),
-              ListTile(selectedTileColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.14), selectedColor: Theme.of(context).colorScheme.primary, leading: const Icon(Icons.history), title: const Text('历史会话'), onTap: () { Navigator.pop(context); setState(() => _index = 2); }),
-              const Divider(),
-              for (var i = 0; i < _labels.length; i++)
-                ListTile(selectedTileColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.14), selectedColor: Theme.of(context).colorScheme.primary, leading: Icon(_icons[i]), title: Text(_labels[i]), selected: _index == i, onTap: () => _select(i)),
-            ],
-          ),
+        child: Consumer(
+          builder: (BuildContext context, WidgetRef ref, Widget? _) {
+            final bool glass = ref.watch(themeControllerProvider).glassEnabled;
+            final Widget content = SafeArea(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(8, 20, 8, 20),
+                children: <Widget>[
+                  const Padding(padding: EdgeInsets.fromLTRB(16, 0, 16, 20), child: Text('Cup Memo', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700))),
+                  ListTile(selectedTileColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.14), selectedColor: Theme.of(context).colorScheme.primary, leading: const Icon(Icons.add_comment_outlined), title: const Text('新建对话'), onTap: () { Navigator.pop(context); setState(() => _index = 2); }),
+                  ListTile(selectedTileColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.14), selectedColor: Theme.of(context).colorScheme.primary, leading: const Icon(Icons.history), title: const Text('历史会话'), onTap: () { Navigator.pop(context); setState(() => _index = 2); }),
+                  const Divider(),
+                  for (var i = 0; i < _labels.length; i++)
+                    ListTile(selectedTileColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.14), selectedColor: Theme.of(context).colorScheme.primary, leading: Icon(_icons[i]), title: Text(_labels[i]), selected: _index == i, onTap: () => _select(i)),
+                ],
+              ),
+            );
+            return glass ? GlassContainer.card(padding: EdgeInsets.zero, child: content) : content;
+          },
         ),
       ),
       body: IndexedStack(index: _index, children: _pages),
