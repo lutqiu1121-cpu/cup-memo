@@ -95,7 +95,6 @@ class AgentProviderClient implements ProviderClient {
       baseUrl: Uri.parse(config.baseUrl),
       headers: config.extraHeaders,
       name: 'cup_memo_${config.id}',
-      defaultModelNames: <da.ModelKind, String>{da.ModelKind.chat: model ?? config.defaultModel},
     );
     return da.Agent.forProvider(provider, chatModelName: model, tools: tools);
   }
