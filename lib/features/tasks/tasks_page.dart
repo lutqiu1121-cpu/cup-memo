@@ -176,7 +176,7 @@ class _TasksPageState extends ConsumerState<TasksPage>
     final ThemeData theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.menu), onPressed: () => appShellScaffoldKey.currentState?.openDrawer()),
+        leading: IconButton(tooltip: '菜单', icon: const Icon(Icons.menu), onPressed: () => appShellScaffoldKey.currentState?.openDrawer()),
         title: const Text('任务'),
         bottom: TabBar(
           controller: _tabController,

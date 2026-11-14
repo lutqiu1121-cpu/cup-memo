@@ -156,7 +156,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     final String trimmed = _query.trim();
 
     return Scaffold(
-      appBar: AppBar(leading: IconButton(icon: const Icon(Icons.menu), onPressed: () => appShellScaffoldKey.currentState?.openDrawer()), title: const Text('搜索')),
+      appBar: AppBar(leading: IconButton(tooltip: '菜单', icon: const Icon(Icons.menu), onPressed: () => appShellScaffoldKey.currentState?.openDrawer()), title: const Text('搜索')),
       body: Column(
         children: <Widget>[
           Padding(
