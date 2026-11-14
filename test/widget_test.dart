@@ -96,6 +96,6 @@ void main() {
     await tester.tap(find.byTooltip('发送'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('该板块待实现'), findsOneWidget);
+    expect(find.textContaining('请先配置 Provider'), findsOneWidget);
   });
 }
