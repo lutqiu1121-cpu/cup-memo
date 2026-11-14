@@ -24,8 +24,9 @@ class AppTheme {
     ).copyWith(surface: AppColors.card, onSurface: AppColors.textPrimary);
 
     final ThemeData base = ThemeData(colorScheme: scheme, useMaterial3: true);
+    final Color foreground = brightness == Brightness.dark ? Colors.white : AppColors.textPrimary;
     final TextTheme textTheme = base.textTheme
-        .apply(bodyColor: AppColors.textPrimary, displayColor: AppColors.textPrimary)
+        .apply(bodyColor: foreground, displayColor: foreground)
         .copyWith(
           titleLarge: base.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
           titleMedium: base.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
@@ -36,6 +37,7 @@ class AppTheme {
       canvasColor: backgroundColor ?? (brightness == Brightness.dark ? const Color(0xFF121212) : AppColors.background),
       colorScheme: scheme,
       textTheme: textTheme,
+      brightness: brightness,
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
@@ -53,7 +55,7 @@ class AppTheme {
         ),
       ),
       cardTheme: CardThemeData(
-        color: AppColors.card,
+        color: brightness == Brightness.dark ? const Color(0xFF1E1E1E) : AppColors.card,
         elevation: 2,
         shadowColor: AppColors.textPrimary.withValues(alpha: 0.08),
         surfaceTintColor: Colors.transparent,
@@ -63,7 +65,7 @@ class AppTheme {
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: AppColors.card,
+        backgroundColor: brightness == Brightness.dark ? const Color(0xFF1E1E1E) : AppColors.card,
         surfaceTintColor: Colors.transparent,
         indicatorColor: seedColor.withValues(alpha: 0.45),
         elevation: 2,
@@ -128,22 +130,22 @@ class AppTheme {
         iconColor: AppColors.textSecondary,
         textColor: AppColors.textPrimary,
       ),
-      bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: AppColors.card,
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: brightness == Brightness.dark ? const Color(0xFF1E1E1E) : AppColors.card,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(cardRadius)),
         ),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: AppColors.card,
+        backgroundColor: brightness == Brightness.dark ? const Color(0xFF1E1E1E) : AppColors.card,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(cardRadius),
         ),
       ),
       chipTheme: base.chipTheme.copyWith(
-        backgroundColor: AppColors.card,
+        backgroundColor: brightness == Brightness.dark ? const Color(0xFF1E1E1E) : AppColors.card,
         side: const BorderSide(color: Color(0xFFE6E0D4)),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
