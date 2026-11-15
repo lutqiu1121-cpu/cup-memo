@@ -27,7 +27,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // The chat page is now the default home page.
-    expect(find.text('还没有可用的 Provider'), findsOneWidget);
+    expect(find.text('还没有可用的服务商'), findsOneWidget);
     expect(find.byTooltip('菜单'), findsOneWidget);
 
     await tester.tap(find.byTooltip('菜单'));
@@ -67,7 +67,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('还没有可用的 Provider'), findsOneWidget);
+    expect(find.text('还没有可用的服务商'), findsOneWidget);
     expect(find.byTooltip('新建对话'), findsOneWidget);
   });
 }
