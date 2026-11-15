@@ -17,11 +17,13 @@ import '../../services/provider/provider_config.dart';
 import '../../services/provider/model_capabilities.dart';
 import '../../services/provider/provider_router.dart';
 import '../../services/github_service.dart';
+import '../../services/search/web_search_service.dart';
 
 import 'package:dartantic_ai/dartantic_ai.dart' as da;
 import 'package:flutter/services.dart';
 
 import '../settings/provider_management_page.dart';
+import '../settings/provider_form_page.dart';
 
 class StreamingBubbleNotifier extends ValueNotifier<String> {
   StreamingBubbleNotifier() : super('');
@@ -59,6 +61,9 @@ class ChatPageState extends ConsumerState<ChatPage> {
       <String, StreamingBubbleNotifier>{};
   int _activeTurnId = 0;
   String? _sessionId;
+  int _historyOffset = 0;
+  bool _loadingOlder = false;
+  bool _hasOlder = true;
   bool _sending = false;
   bool _webSearch = false;
   final bool _toolsEnabled = true;
@@ -74,13 +79,48 @@ class ChatPageState extends ConsumerState<ChatPage> {
     Future<void>.microtask(_ensureSession);
   }
 
-  void _ensureSession() {
+  Future<void> _ensureSession() async {
     if (_sessionId != null) return;
     final db = ref.read(databaseProvider);
-    final empty = db?.sessionDao.findEmpty();
-    setState(
-      () => _sessionId = empty?.id ?? db?.sessionDao.create() ?? newSessionId(),
+    final latest = db?.sessionDao.latestActive();
+    final String id = latest?.id ?? db?.sessionDao.create() ?? newSessionId();
+    final List<ChatMessage> history =
+        db?.chatMessageDao.list(id, limit: 50) ?? const <ChatMessage>[];
+    _historyOffset = history.length;
+    _hasOlder = history.length == 50;
+    if (!mounted) return;
+    setState(() {
+      _sessionId = id;
+      _messages
+        ..clear()
+        ..addAll(history);
+    });
+  }
+
+  Future<void> _loadOlder() async {
+    if (_loadingOlder || !_hasOlder || _sessionId == null) return;
+    final db = ref.read(databaseProvider);
+    if (db == null) return;
+    _loadingOlder = true;
+    final double oldExtent = _scroll.hasClients
+        ? _scroll.position.maxScrollExtent
+        : 0;
+    final List<ChatMessage> older = db.chatMessageDao.list(
+      _sessionId!,
+      limit: 50,
+      offset: _historyOffset,
     );
+    setState(() {
+      _messages.insertAll(0, older);
+      _historyOffset += older.length;
+      _hasOlder = older.length == 50;
+      _loadingOlder = false;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scroll.hasClients) {
+        _scroll.jumpTo(_scroll.position.maxScrollExtent - oldExtent);
+      }
+    });
   }
 
   Future<void> startNewSession() => _newSession();
@@ -92,6 +132,8 @@ class ChatPageState extends ConsumerState<ChatPage> {
       _sessionId = db?.sessionDao.create() ?? newSessionId();
       _messages.clear();
       _reasoning.clear();
+      _historyOffset = 0;
+      _hasOlder = false;
     });
   }
 
@@ -119,18 +161,6 @@ class ChatPageState extends ConsumerState<ChatPage> {
       '【以下是用户设定的项目背景，请优先参考，但不要擅自修改】\n${blocks.join('\n')}',
       '【本地工具说明】你可以使用备忘录、任务工具，以及 fetch_github_file 和 commit_github_file 读取或写入 GitHub；只有用户明确要求时才写入。',
     ];
-    if (_webSearch) {
-      final List<Entry> hits = await service.search(query);
-      final List<String> searchBlocks = <String>[];
-      for (final Entry hit in hits.take(5)) {
-        searchBlocks.add(
-          '[本地搜索 ${hit.title}]：${(await service.readBody(hit)).trim()}',
-        );
-      }
-      prompts.add(
-        '【联网搜索开关已开启】当前无外部搜索 API，优先使用以下本地搜索上下文：\n${searchBlocks.join('\n')}',
-      );
-    }
     return prompts;
   }
 
@@ -276,6 +306,30 @@ class ChatPageState extends ConsumerState<ChatPage> {
           return 'GitHub commit completed';
         },
       ),
+      if (_webSearch)
+        da.Tool<Map<String, dynamic>>(
+          name: 'web_search',
+          description: 'Search the web using the configured search provider.',
+          inputSchema: da.Schema.fromMap({
+            'type': 'object',
+            'properties': {
+              'query': {'type': 'string'},
+            },
+            'required': ['query'],
+          }),
+          onCall: (Map<String, dynamic> args) async {
+            final WebSearchConfig config = WebSearchConfig.load(
+              ref.read(sharedPreferencesProvider),
+            );
+            if (config.provider != WebSearchProvider.searxng &&
+                config.apiKey.isEmpty) {
+              return 'Search API key is not configured';
+            }
+            final results = await WebSearchService(config)
+                .search(args['query']?.toString() ?? '');
+            return results;
+          },
+        ),
       da.Tool<Map<String, dynamic>>(
         name: 'list_tasks',
         description: 'List current and recently completed tasks.',
@@ -301,7 +355,12 @@ class ChatPageState extends ConsumerState<ChatPage> {
 
   String _friendlyError(Object error) {
     final String text = error.toString().toLowerCase();
-    if (text.contains('401') || text.contains('403')) return 'API 密钥无效或未授权';
+    if (text.contains('401') ||
+        text.contains('403') ||
+        text.contains('authenticationexception') ||
+        text.contains('permissiondeniedexception')) {
+      return 'API 密钥无效或未授权';
+    }
     if (text.contains('timeout') || text.contains('timed out')) {
       return '网络连接超时，请检查网络';
     }
@@ -322,7 +381,7 @@ class ChatPageState extends ConsumerState<ChatPage> {
     );
     if (router == null) {
       if (!mounted) return;
-      showPendingSnackBar(context, '请先配置 Provider 和 API Key');
+      showPendingSnackBar(context, '请先配置服务商和访问密钥');
       return;
     }
 
@@ -436,7 +495,10 @@ class ChatPageState extends ConsumerState<ChatPage> {
             createdAt: old.createdAt,
             providerId: old.providerId,
             model: old.model,
+            parentId: old.parentId,
+            childrenIds: old.childrenIds,
           );
+          ref.read(databaseProvider)?.chatMessageDao.upsert(_messages[index]);
         });
       }
     } finally {
@@ -498,7 +560,7 @@ class ChatPageState extends ConsumerState<ChatPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            const ListTile(title: Text('切换 Provider（影响后续消息）')),
+            const ListTile(title: Text('切换服务商（影响后续消息）')),
             for (final ProviderConfig item in list.items)
               ListTile(
                 leading: const Icon(Icons.hub_outlined),
@@ -515,9 +577,15 @@ class ChatPageState extends ConsumerState<ChatPage> {
       ),
     );
     if (selected == null || !mounted) return;
+    if (selected == '__add__') {
+      await Navigator.of(
+        context,
+      ).push(MaterialPageRoute<void>(builder: (_) => const ProviderFormPage()));
+      return;
+    }
     ref.read(currentProviderIdProvider.notifier).select(selected);
     ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Provider 已切换，仅影响后续消息')));
+        .showSnackBar(const SnackBar(content: Text('服务商已切换，仅影响后续消息')));
   }
 
   @override
@@ -554,7 +622,7 @@ class ChatPageState extends ConsumerState<ChatPage> {
               padding: const EdgeInsets.only(right: 12),
               child: ActionChip(
                 avatar: const Icon(Icons.hub_outlined, size: 16),
-                label: Text(active?.name ?? '未配置 Provider'),
+                label: Text(active?.name ?? '未配置服务商'),
                 onPressed: _pickProvider,
               ),
             ),
@@ -566,95 +634,108 @@ class ChatPageState extends ConsumerState<ChatPage> {
               child: _messages.isEmpty
                   ? EmptyState(
                       icon: Icons.forum_outlined,
-                      title: active == null ? '还没有可用的 Provider' : '会话尚未开始',
+                      title: active == null ? '还没有可用的服务商' : '会话尚未开始',
                       description: active == null
-                          ? '先在设置中添加 Provider 与 API Key。'
+                          ? '先添加服务商和访问密钥。'
                           : '输入消息开始流式对话。AI 可调用本地搜索和创建条目工具。',
-                      actionLabel: active == null ? '去配置 Provider' : null,
+                      actionLabel: active == null ? '添加服务商' : null,
                       onAction: active == null ? _pickProvider : null,
                     )
-                  : ListView.builder(
-                      controller: _scroll,
-                      addAutomaticKeepAlives: false,
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                      itemCount: _messages.length,
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      itemBuilder: (BuildContext context, int index) => _Bubble(
-                        message: _messages[index],
-                        reasoning: _reasoning[_messages[index].id],
+                  : NotificationListener<ScrollNotification>(
+                      onNotification: (ScrollNotification notification) {
+                        if (notification.metrics.pixels <= 80 && _hasOlder) {
+                          _loadOlder();
+                        }
+                        return false;
+                      },
+                      child: ListView.builder(
+                        controller: _scroll,
+                        addAutomaticKeepAlives: false,
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                        itemCount: _messages.length,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        itemBuilder: (BuildContext context, int index) =>
+                            _Bubble(
+                              message: _messages[index],
+                              reasoning: _reasoning[_messages[index].id],
+                            ),
                       ),
                     ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-              child: Column(
-                children: <Widget>[
-                  if (active != null && active.availableModels.isNotEmpty)
-                    DropdownButton<String>(
-                      value: active.availableModels.contains(activeModel)
-                          ? activeModel
-                          : null,
-                      isExpanded: true,
-                      underline: const SizedBox.shrink(),
-                      items: active.availableModels
-                          .map(
-                            (String model) => DropdownMenuItem<String>(
-                              value: model,
-                              child: Text(model),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (String? value) {
-                        if (value != null) {
-                          setState(() {
-                            _selectedModel = value;
-                            _thinkingEnabled =
-                                ModelCapabilitiesRegistry.forModel(
-                                  value,
-                                  manualOverride: active.modelParameters,
-                                ).supportsThinking;
-                          });
-                        }
-                      },
-                    )
-                  else
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        '模型：$activeModel',
-                        style: Theme.of(context).textTheme.labelMedium,
-                      ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: <Widget>[
+                    ActionChip(
+                      avatar: const Icon(Icons.memory_outlined, size: 16),
+                      label: Text(activeModel.isEmpty ? '选择模型' : activeModel),
+                      onPressed: active == null
+                          ? null
+                          : () async {
+                              final String? value =
+                                  await showModalBottomSheet<String>(
+                                    context: context,
+                                    builder: (BuildContext sheet) => SafeArea(
+                                      child: ListView(
+                                        shrinkWrap: true,
+                                        children: <Widget>[
+                                          const ListTile(title: Text('选择模型')),
+                                          for (final String model
+                                              in active.availableModels)
+                                            ListTile(
+                                              title: Text(model),
+                                              trailing: model == activeModel
+                                                  ? const Icon(Icons.check)
+                                                  : null,
+                                              onTap: () =>
+                                                  Navigator.pop(sheet, model),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                              if (value != null && mounted) {
+                                setState(() {
+                                  _selectedModel = value;
+                                  _thinkingEnabled =
+                                      ModelCapabilitiesRegistry.forModel(
+                                        value,
+                                        manualOverride: active.modelParameters,
+                                      ).supportsThinking;
+                                });
+                              }
+                            },
                     ),
-                  Row(
-                    children: <Widget>[
-                      FilterChip(
-                        avatar: Icon(
-                          _thinkingEnabled
-                              ? Icons.psychology
-                              : Icons.psychology_outlined,
-                          size: 16,
-                        ),
-                        label: const Text('深度思考'),
-                        selected: _thinkingEnabled,
-                        onSelected: caps.supportsThinking
-                            ? (bool value) =>
-                                  setState(() => _thinkingEnabled = value)
-                            : null,
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      avatar: Icon(
+                        _thinkingEnabled
+                            ? Icons.psychology
+                            : Icons.psychology_outlined,
+                        size: 16,
                       ),
-                      const SizedBox(width: 8),
-                      FilterChip(
-                        avatar: Icon(
-                          _webSearch ? Icons.public : Icons.public_off,
-                          size: 16,
-                        ),
-                        label: const Text('联网搜索'),
-                        selected: _webSearch,
-                        onSelected: (bool value) =>
-                            setState(() => _webSearch = value),
+                      label: const Text('深度思考'),
+                      selected: _thinkingEnabled,
+                      onSelected: caps.supportsThinking
+                          ? (bool value) =>
+                                setState(() => _thinkingEnabled = value)
+                          : null,
+                    ),
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      avatar: Icon(
+                        _webSearch ? Icons.public : Icons.public_off,
+                        size: 16,
                       ),
-                    ],
-                  ),
-                ],
+                      label: const Text('联网搜索'),
+                      selected: _webSearch,
+                      onSelected: (bool value) =>
+                          setState(() => _webSearch = value),
+                    ),
+                  ],
+                ),
               ),
             ),
             SafeArea(

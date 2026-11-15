@@ -8,6 +8,7 @@ import '../../providers/app_providers.dart';
 import '../../services/provider/provider_config.dart';
 import '../../services/provider/provider_presets.dart';
 import '../../services/provider/model_capabilities.dart';
+import '../../services/provider/provider_router.dart';
 
 /// Add / edit form for a [ProviderConfig].
 ///
@@ -127,55 +128,54 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
     final String base = _baseUrl.text.trim().replaceFirst(RegExp(r'/+$'), '');
     if (base.isEmpty) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('请先填写 baseUrl')));
+          .showSnackBar(const SnackBar(content: Text('请先填写接口地址 (Base URL)')));
       return;
     }
     final String key = _apiKey.text.trim();
     if (key.isEmpty && _kind != ProviderKind.ollama) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('请先填写 API Key')));
+          .showSnackBar(const SnackBar(content: Text('请先填写访问密钥 (API Key)')));
       return;
     }
 
     setState(() => _loadingModels = true);
     try {
-      final Map<String, String> headers = <String, String>{
-        ...ProviderConfig.parseHeadersText(_headers.text),
-      };
-      String modelsUrl;
-      if (_kind == ProviderKind.anthropic) {
-        modelsUrl = base.endsWith('/v1') ? '$base/models' : '$base/v1/models';
-        headers['x-api-key'] = key;
-        headers['anthropic-version'] ??= '2023-06-01';
-        headers.remove('Authorization');
-      } else {
-        modelsUrl = '$base/models';
-        if (key.isNotEmpty) headers['Authorization'] = 'Bearer $key';
-      }
-
-      final response = await Dio().get<dynamic>(
-        modelsUrl,
-        options: Options(
-          headers: headers.isEmpty ? null : headers,
-          validateStatus: (int? status) =>
-              status != null && status >= 200 && status < 300,
-        ),
+      final ProviderConfig temporary = ProviderConfig(
+        id: 'discovery',
+        name: _name.text.isEmpty ? '服务商' : _name.text,
+        kind: _kind,
+        baseUrl: _baseUrl.text.trim(),
+        apiKeyRef: 'discovery',
+        defaultModel: _model.text.trim(),
+        extraHeaders: ProviderConfig.parseHeadersText(_headers.text),
       );
-      final dynamic raw = response.data is Map
-          ? (response.data as Map)['data']
-          : response.data;
-      final List<String> models = raw is List
-          ? raw
-                .map((Object? value) {
-                  if (value is Map) {
-                    return (value['id'] ?? value['name'])?.toString();
-                  }
-                  return value?.toString();
-                })
-                .whereType<String>()
-                .where((String value) => value.isNotEmpty)
-                .toList()
-          : const <String>[];
+      final ProviderRouter router = ProviderRouter(temporary, apiKey: key);
+      final List<DiscoveredModel> discovered = await router.discoverModels();
+      final List<String> models = discovered
+          .map((DiscoveredModel m) => m.id)
+          .toList(growable: false);
+      if (_kind == ProviderKind.ollama && models.isNotEmpty) {
+        final List<DiscoveredModel> enriched = await Future.wait(
+          discovered.map((DiscoveredModel item) async {
+            final int? context = await router.ollamaContextLength(item.id);
+            return context == null
+                ? item
+                : DiscoveredModel(
+                    id: item.id,
+                    metadata: <String, dynamic>{
+                      ...item.metadata,
+                      'context_length': context,
+                    },
+                  );
+          }),
+        );
+        if (enriched.isNotEmpty) {
+          _capabilities = ModelCapabilitiesRegistry.resolveModelCaps(
+            model: enriched.first.id,
+            providerMetadata: enriched.first.metadata,
+          );
+        }
+      }
       if (!mounted) return;
       setState(() {
         _models = models;
@@ -203,12 +203,80 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
       if (!mounted) return;
       setState(() => _loadingModels = false);
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('获取模型失败：$error')));
+          .showSnackBar(const SnackBar(content: Text('获取模型失败，请检查接口地址和服务商设置')));
+    }
+  }
+
+  Future<void> _selectModel() async {
+    final TextEditingController search = TextEditingController();
+    final String? chosen = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (BuildContext sheet) {
+        List<String> filtered = List<String>.of(_models);
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setSheet) => SafeArea(
+            child: SizedBox(
+              height: MediaQuery.sizeOf(context).height * .75,
+              child: Column(
+                children: <Widget>[
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: TextField(
+                      controller: search,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.search),
+                        hintText: '搜索模型',
+                      ),
+                      onChanged: (String query) => setSheet(() {
+                        filtered = _models
+                            .where(
+                              (String model) => model.toLowerCase().contains(
+                                query.toLowerCase(),
+                              ),
+                            )
+                            .toList();
+                      }),
+                    ),
+                  ),
+                  Expanded(
+                    child: RadioGroup<String>(
+                      groupValue: _model.text,
+                      onChanged: (String? value) => Navigator.pop(sheet, value),
+                      child: ListView(
+                        children: filtered
+                            .map(
+                              (String model) => RadioListTile<String>(
+                                value: model,
+                                title: Text(model),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    search.dispose();
+    if (chosen != null && mounted) {
+      setState(() {
+        _model.text = chosen;
+        _refreshCapabilities(chosen);
+      });
     }
   }
 
   void _refreshCapabilities(String model) {
-    setState(() => _capabilities = ModelCapabilitiesRegistry.forModel(model));
+    setState(
+      () => _capabilities = ModelCapabilitiesRegistry.resolveModelCaps(
+        model: model,
+      ),
+    );
   }
 
   String? _validateRequired(String? value, String label) {
@@ -221,11 +289,11 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
   String? _validateBaseUrl(String? value) {
     final String text = (value ?? '').trim();
     if (text.isEmpty) {
-      return '请填写 baseUrl';
+      return '请填写接口地址 (Base URL)';
     }
     final Uri? uri = Uri.tryParse(text);
     if (uri == null || !uri.hasScheme) {
-      return 'baseUrl 需要包含协议，例如 https://api.example.com/v1';
+      return '接口地址需要包含协议，例如 https://api.example.com/v1';
     }
     return null;
   }
@@ -294,9 +362,7 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
     final bool ollama = _kind == ProviderKind.ollama;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.isEditing ? '编辑 Provider' : '添加 Provider'),
-      ),
+      appBar: AppBar(title: Text(widget.isEditing ? '编辑服务商' : '添加服务商')),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -330,7 +396,7 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
             const SizedBox(height: 14),
             TextFormField(
               controller: _name,
-              decoration: const InputDecoration(labelText: '名称'),
+              decoration: const InputDecoration(labelText: '服务商名称'),
               validator: (String? value) => _validateRequired(value, '名称'),
             ),
             const SizedBox(height: 14),
@@ -358,7 +424,7 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
               controller: _baseUrl,
               keyboardType: TextInputType.url,
               decoration: const InputDecoration(
-                labelText: 'baseUrl',
+                labelText: '接口地址 (Base URL)',
                 hintText: 'https://api.example.com/v1',
               ),
               validator: _validateBaseUrl,
@@ -370,10 +436,10 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
               enableSuggestions: false,
               autocorrect: false,
               decoration: InputDecoration(
-                labelText: 'API Key',
+                labelText: '访问密钥 (API Key)',
                 hintText: widget.isEditing ? '留空表示不修改' : 'sk-…',
                 helperText: ollama
-                    ? 'Ollama 本地部署通常不需要 API Key'
+                    ? '本地 Ollama 通常不需要访问密钥'
                     : '仅保存在 flutter_secure_storage，数据库只记录 apiKeyRef',
                 prefixIcon: const Icon(Icons.key_outlined),
               ),
@@ -410,31 +476,16 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
                 ),
               ],
             ),
-            if (_models.isNotEmpty) ...<Widget>[
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                initialValue: _models.contains(_model.text)
-                    ? _model.text
-                    : null,
-                decoration: const InputDecoration(labelText: '模型列表选择'),
-                items: _models
-                    .map(
-                      (String model) => DropdownMenuItem<String>(
-                        value: model,
-                        child: Text(model),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (String? value) {
-                  if (value != null) {
-                    _model.text = value;
-                    _refreshCapabilities(value);
-                  }
-                },
+            if (_models.isNotEmpty)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(_model.text.isEmpty ? '选择模型' : _model.text),
+                subtitle: const Text('点击选择已发现的模型'),
+                trailing: const Icon(Icons.arrow_drop_down_circle_outlined),
+                onTap: _selectModel,
               ),
-            ],
             const SizedBox(height: 14),
-            Text('Temperature：${_temperature.toStringAsFixed(1)}'),
+            Text('发散程度（越低越严谨）：${_temperature.toStringAsFixed(1)}'),
             Slider(
               value: _temperature,
               min: 0,
@@ -445,7 +496,7 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
             TextField(
               controller: TextEditingController(text: _maxTokens.toString()),
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Max Tokens'),
+              decoration: const InputDecoration(labelText: '最大输出长度'),
               onSubmitted: (String value) {
                 final parsed = int.tryParse(value);
                 if (parsed != null) {
@@ -561,8 +612,8 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
             const SizedBox(height: 8),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('设为默认 Provider'),
-              subtitle: const Text('新会话默认使用该 Provider'),
+              title: const Text('设为默认服务商'),
+              subtitle: const Text('新会话默认使用该服务商'),
               value: _isDefault,
               onChanged: (bool value) => setState(() => _isDefault = value),
             ),
@@ -575,11 +626,11 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
                       height: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : Text(widget.isEditing ? '保存修改' : '添加 Provider'),
+                  : Text(widget.isEditing ? '保存修改' : '添加服务商'),
             ),
             const SizedBox(height: 10),
             Text(
-              'API Key 保存在系统安全沙盒中，本地数据库仅记录引用。',
+              '访问密钥保存在系统安全沙盒中，本地数据库仅记录引用。',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: AppColors.textSecondary,
               ),

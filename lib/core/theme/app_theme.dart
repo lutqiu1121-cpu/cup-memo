@@ -17,25 +17,46 @@ class AppTheme {
 
   static const double cardRadius = 16;
 
-  static ThemeData build(Color seedColor, {Brightness brightness = Brightness.light, Color? backgroundColor}) {
-    final Color surface = brightness == Brightness.dark ? const Color(0xFF1E1E1E) : AppColors.card;
-    final Color foreground = brightness == Brightness.dark ? Colors.white : AppColors.textPrimary;
-    final ColorScheme scheme = ColorScheme.fromSeed(
-      seedColor: seedColor,
-      brightness: brightness,
-    ).copyWith(surface: surface, surfaceContainer: surface, onSurface: foreground);
+  static ThemeData build(
+    Color seedColor, {
+    Brightness brightness = Brightness.light,
+    Color? backgroundColor,
+  }) {
+    final Color surface = brightness == Brightness.dark
+        ? const Color(0xFF1E1E1E)
+        : AppColors.card;
+    final Color foreground = brightness == Brightness.dark
+        ? Colors.white
+        : AppColors.textPrimary;
+    final ColorScheme scheme =
+        ColorScheme.fromSeed(
+          seedColor: seedColor,
+          brightness: brightness,
+        ).copyWith(
+          surface: surface,
+          surfaceContainer: surface,
+          onSurface: foreground,
+        );
 
     final ThemeData base = ThemeData(colorScheme: scheme, useMaterial3: true);
     final TextTheme textTheme = base.textTheme
         .apply(bodyColor: foreground, displayColor: foreground)
         .copyWith(
-          titleLarge: base.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
-          titleMedium: base.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+          titleLarge: base.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+          titleMedium: base.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
         );
 
     return base.copyWith(
-      scaffoldBackgroundColor: backgroundColor ?? (brightness == Brightness.dark ? const Color(0xFF121212) : AppColors.background),
-      canvasColor: backgroundColor ?? (brightness == Brightness.dark ? const Color(0xFF121212) : AppColors.background),
+      scaffoldBackgroundColor: brightness == Brightness.dark
+          ? const Color(0xFF121212)
+          : (backgroundColor ?? AppColors.background),
+      canvasColor: brightness == Brightness.dark
+          ? const Color(0xFF121212)
+          : (backgroundColor ?? AppColors.background),
       colorScheme: scheme,
       textTheme: textTheme,
       brightness: brightness,
@@ -66,7 +87,9 @@ class AppTheme {
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: brightness == Brightness.dark ? const Color(0xFF1E1E1E) : AppColors.card,
+        backgroundColor: brightness == Brightness.dark
+            ? const Color(0xFF1E1E1E)
+            : AppColors.card,
         surfaceTintColor: Colors.transparent,
         indicatorColor: seedColor.withValues(alpha: 0.45),
         elevation: 2,
@@ -78,7 +101,9 @@ class AppTheme {
                 : AppColors.textSecondary,
           );
         }),
-        labelTextStyle: WidgetStateProperty.resolveWith((Set<WidgetState> states) {
+        labelTextStyle: WidgetStateProperty.resolveWith((
+          Set<WidgetState> states,
+        ) {
           return TextStyle(
             fontSize: 12,
             color: states.contains(WidgetState.selected)
@@ -92,10 +117,15 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: surface,
+        fillColor: brightness == Brightness.dark
+            ? const Color(0xFF252525)
+            : surface,
         hintStyle: const TextStyle(color: AppColors.textSecondary),
         labelStyle: const TextStyle(color: AppColors.textSecondary),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
         border: _inputBorder(const Color(0xFFE6E0D4)),
         enabledBorder: _inputBorder(const Color(0xFFE6E0D4)),
         focusedBorder: _inputBorder(scheme.primary),
@@ -104,7 +134,9 @@ class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         ),
       ),
@@ -112,13 +144,17 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: foreground,
           side: const BorderSide(color: Color(0xFFE0D9CB)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         ),
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: AppColors.textPrimary,
-        contentTextStyle: TextStyle(color: brightness == Brightness.dark ? Colors.white : AppColors.card),
+        contentTextStyle: TextStyle(
+          color: brightness == Brightness.dark ? Colors.white : AppColors.card,
+        ),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
@@ -128,29 +164,35 @@ class AppTheme {
         space: 1,
       ),
       listTileTheme: ListTileThemeData(
-        iconColor: brightness == Brightness.dark ? Colors.white70 : AppColors.textSecondary,
+        iconColor: brightness == Brightness.dark
+            ? Colors.white70
+            : AppColors.textSecondary,
         textColor: foreground,
       ),
       bottomSheetTheme: BottomSheetThemeData(
-        backgroundColor: brightness == Brightness.dark ? const Color(0xFF1E1E1E) : AppColors.card,
+        backgroundColor: brightness == Brightness.dark
+            ? const Color(0xFF1E1E1E)
+            : AppColors.card,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(cardRadius)),
         ),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: brightness == Brightness.dark ? const Color(0xFF1E1E1E) : AppColors.card,
+        backgroundColor: brightness == Brightness.dark
+            ? const Color(0xFF1E1E1E)
+            : AppColors.card,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(cardRadius),
         ),
       ),
       chipTheme: base.chipTheme.copyWith(
-        backgroundColor: brightness == Brightness.dark ? const Color(0xFF1E1E1E) : AppColors.card,
+        backgroundColor: brightness == Brightness.dark
+            ? const Color(0xFF1E1E1E)
+            : AppColors.card,
         side: const BorderSide(color: Color(0xFFE6E0D4)),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }

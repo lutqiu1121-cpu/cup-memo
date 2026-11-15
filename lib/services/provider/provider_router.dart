@@ -235,11 +235,42 @@ class ProviderRouter {
   final ProviderConfig config;
   final String? apiKey;
 
+  Future<int?> ollamaContextLength(String model) async {
+    if (config.kind != ProviderKind.ollama) return null;
+    try {
+      final String root = config.baseUrl
+          .replaceFirst(RegExp(r'/v1/?$'), '')
+          .replaceFirst(RegExp(r'/+$'), '');
+      final http.Response response = await http
+          .post(
+            Uri.parse('$root/api/show'),
+            headers: const <String, String>{'content-type': 'application/json'},
+            body: jsonEncode(<String, String>{'name': model}),
+          )
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode < 200 || response.statusCode >= 300) return null;
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is! Map) return null;
+      final dynamic info = decoded['model_info'];
+      if (info is Map) {
+        for (final MapEntry<dynamic, dynamic> entry in info.entries) {
+          if (entry.key.toString().endsWith('.context_length') &&
+              entry.value is num) {
+            return (entry.value as num).toInt();
+          }
+        }
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<List<DiscoveredModel>> discoverModels() async {
     final String base = config.baseUrl.replaceFirst(RegExp(r'/+$'), '');
     final Uri uri = Uri.parse(
       config.kind == ProviderKind.ollama && !base.endsWith('/v1')
-          ? '$base/v1/models'
+          ? '$base/api/tags'
           : '$base/models',
     );
     final Map<String, String> headers = <String, String>{
@@ -251,7 +282,9 @@ class ProviderRouter {
       throw StateError('模型发现失败：HTTP ${response.statusCode}');
     }
     final dynamic decoded = jsonDecode(response.body);
-    final dynamic data = decoded is Map ? decoded['data'] : decoded;
+    final dynamic data = decoded is Map
+        ? (decoded['data'] ?? decoded['models'])
+        : decoded;
     if (data is! List) return const <DiscoveredModel>[];
     return data
         .whereType<Map>()

@@ -124,6 +124,28 @@ class AppDatabase {
         "CREATE TABLE IF NOT EXISTS chat_messages (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, parent_id TEXT, children_ids TEXT DEFAULT '[]', role TEXT NOT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL, provider_id TEXT, model TEXT, active INTEGER DEFAULT 1)",
       );
     }
+    if (oldVersion < 8) {
+      final List<String> columns = db
+          .select('PRAGMA table_info(chat_messages)')
+          .map((Row row) => row['name'] as String)
+          .toList();
+      for (final String statement in <String>[
+        "ALTER TABLE chat_messages ADD COLUMN parent_id TEXT",
+        "ALTER TABLE chat_messages ADD COLUMN children_ids TEXT DEFAULT '[]'",
+        "ALTER TABLE chat_messages ADD COLUMN provider_id TEXT",
+        "ALTER TABLE chat_messages ADD COLUMN model TEXT",
+        "ALTER TABLE chat_messages ADD COLUMN active INTEGER DEFAULT 1",
+      ]) {
+        try {
+          final String column = statement
+              .split(' ADD COLUMN ')
+              .last
+              .split(' ')
+              .first;
+          if (!columns.contains(column)) db.execute(statement);
+        } catch (_) {}
+      }
+    }
   }
 
   /// Closes the underlying connection. Safe to call once.

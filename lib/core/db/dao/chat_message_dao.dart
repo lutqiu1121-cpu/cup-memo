@@ -8,8 +8,23 @@ class ChatMessageDao {
   ChatMessageDao(this._db);
   final Database _db;
   List<ChatMessage> list(String sessionId, {int limit = 50, int offset = 0}) {
+    final Set<String> columns = _db
+        .select('PRAGMA table_info(chat_messages)')
+        .map((row) => row['name'] as String)
+        .toSet();
+    final String parent = columns.contains('parent_id')
+        ? 'parent_id'
+        : 'NULL AS parent_id';
+    final String children = columns.contains('children_ids')
+        ? 'children_ids'
+        : "'[]' AS children_ids";
+    final String provider = columns.contains('provider_id')
+        ? 'provider_id'
+        : 'NULL AS provider_id';
+    final String model = columns.contains('model') ? 'model' : 'NULL AS model';
+    final String active = columns.contains('active') ? 'AND active = 1' : '';
     final rows = _db.select(
-      'SELECT id, session_id, parent_id, children_ids, role, content, created_at, provider_id, model FROM chat_messages WHERE session_id = ? AND active = 1 ORDER BY created_at ASC LIMIT ? OFFSET ?',
+      'SELECT id, session_id, $parent, $children, role, content, created_at, $provider, $model FROM chat_messages WHERE session_id = ? $active ORDER BY created_at ASC LIMIT ? OFFSET ?',
       [sessionId, limit, offset],
     );
     return rows

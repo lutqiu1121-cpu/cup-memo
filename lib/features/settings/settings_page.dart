@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -12,6 +13,7 @@ import '../archive/archive_page.dart';
 import 'provider_management_page.dart';
 import 'about_licenses_page.dart';
 import 'github_settings_page.dart';
+import 'web_search_settings_page.dart';
 
 /// Tab 5 — settings: theme (fully implemented) + provider management entry.
 enum ThemeModeChoice { system, light, dark }
@@ -38,7 +40,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       showPendingSnackBar(context, '自定义颜色');
       return;
     }
-    final bool ok = await ref.read(themeControllerProvider.notifier).setColor(input);
+    final bool ok = await ref
+        .read(themeControllerProvider.notifier)
+        .setColor(input);
     if (!mounted) {
       return;
     }
@@ -47,7 +51,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ..showSnackBar(
         SnackBar(
           content: Text(
-            ok ? '已应用自定义颜色 ${AppColors.normaliseHex(input)}' : '颜色格式无效，请使用 #RRGGBB',
+            ok
+                ? '已应用自定义颜色 ${AppColors.normaliseHex(input)}'
+                : '颜色格式无效，请使用 #RRGGBB',
           ),
         ),
       );
@@ -64,9 +70,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(content: Text('已恢复默认米白背景色')),
-      );
+      ..showSnackBar(const SnackBar(content: Text('已恢复默认米白背景色')));
   }
 
   @override
@@ -77,7 +81,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final ProviderConfig? defaultProvider = providers.defaultProvider;
 
     return Scaffold(
-      appBar: AppBar(leading: IconButton(tooltip: '菜单', icon: const Icon(Icons.menu), onPressed: () => appShellScaffoldKey.currentState?.openDrawer()), title: const Text('设置')),
+      appBar: AppBar(
+        leading: IconButton(
+          tooltip: '菜单',
+          icon: const Icon(Icons.menu),
+          onPressed: () => appShellScaffoldKey.currentState?.openDrawer(),
+        ),
+        title: const Text('设置'),
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
         children: <Widget>[
@@ -94,7 +105,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   Text('预设色板', style: theme.textTheme.titleSmall),
                   const SizedBox(height: 4),
                   Text(
-                    themeState.brightness == Brightness.dark ? '当前为深色模式' : '当前为浅色模式 · ${themeState.backgroundHex ?? '#FAF7F0'}',
+                    themeState.brightness == Brightness.dark
+                        ? '当前为深色模式'
+                        : '当前为浅色模式 · ${themeState.backgroundHex ?? '#FAF7F0'}',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -126,8 +139,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                               ),
                           ],
                         ),
-                        if (group.key !=
-                            AppColors.presetsByCategory.keys.last)
+                        if (group.key != AppColors.presetsByCategory.keys.last)
                           const SizedBox(height: 14),
                       ],
                     ],
@@ -178,26 +190,70 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
           ),
           const SizedBox(height: 20),
-          _SectionLabel(text: '界面材质与模式'),
+          _SectionLabel(text: '界面模式'),
           const SizedBox(height: 8),
-          Card(child: Column(children: <Widget>[
-            ListTile(leading: const Icon(Icons.brightness_6_outlined), title: const Text('深色模式'), subtitle: Text(themeState.systemMode ? '跟随系统' : (themeState.brightness == Brightness.dark ? '深色' : '浅色')), trailing: DropdownButton<ThemeModeChoice>(value: themeState.systemMode ? ThemeModeChoice.system : (themeState.brightness == Brightness.dark ? ThemeModeChoice.dark : ThemeModeChoice.light), underline: const SizedBox.shrink(), items: const <DropdownMenuItem<ThemeModeChoice>>[
-              DropdownMenuItem(value: ThemeModeChoice.system, child: Text('系统')),
-              DropdownMenuItem(value: ThemeModeChoice.light, child: Text('浅色')),
-              DropdownMenuItem(value: ThemeModeChoice.dark, child: Text('深色')),
-            ], onChanged: (ThemeModeChoice? value) { if (value != null) ref.read(themeControllerProvider.notifier).setBrightness(value == ThemeModeChoice.dark ? Brightness.dark : Brightness.light, system: value == ThemeModeChoice.system); })),
-          ])),
+          Card(
+            child: Column(
+              children: <Widget>[
+                ListTile(
+                  leading: const Icon(Icons.brightness_6_outlined),
+                  title: const Text('深色模式'),
+                  subtitle: Text(
+                    themeState.systemMode
+                        ? '跟随系统'
+                        : (themeState.brightness == Brightness.dark
+                              ? '深色'
+                              : '浅色'),
+                  ),
+                  trailing: DropdownButton<ThemeModeChoice>(
+                    value: themeState.systemMode
+                        ? ThemeModeChoice.system
+                        : (themeState.brightness == Brightness.dark
+                              ? ThemeModeChoice.dark
+                              : ThemeModeChoice.light),
+                    underline: const SizedBox.shrink(),
+                    items: const <DropdownMenuItem<ThemeModeChoice>>[
+                      DropdownMenuItem(
+                        value: ThemeModeChoice.system,
+                        child: Text('系统'),
+                      ),
+                      DropdownMenuItem(
+                        value: ThemeModeChoice.light,
+                        child: Text('浅色'),
+                      ),
+                      DropdownMenuItem(
+                        value: ThemeModeChoice.dark,
+                        child: Text('深色'),
+                      ),
+                    ],
+                    onChanged: (ThemeModeChoice? value) {
+                      if (value != null) {
+                        ref
+                            .read(themeControllerProvider.notifier)
+                            .setBrightness(
+                              value == ThemeModeChoice.dark
+                                  ? Brightness.dark
+                                  : Brightness.light,
+                              system: value == ThemeModeChoice.system,
+                            );
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 20),
-          _SectionLabel(text: 'AI 与 Provider'),
+          _SectionLabel(text: 'AI 与服务商'),
           const SizedBox(height: 8),
           Card(
             child: ListTile(
               leading: const Icon(Icons.hub_outlined),
-              title: const Text('Provider 管理'),
+              title: const Text('服务商管理'),
               subtitle: Text(
                 defaultProvider == null
-                    ? '尚未配置 Provider'
-                    : '默认：${defaultProvider.name} · ${defaultProvider.kind.label}',
+                    ? '尚未配置服务商'
+                    : '默认服务商：${defaultProvider.name} · ${defaultProvider.kind.label}',
               ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(
@@ -216,7 +272,23 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               subtitle: const Text('安全保存 Personal Access Token，供 Agent 文件工具使用'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(builder: (_) => const GitHubSettingsPage()),
+                MaterialPageRoute<void>(
+                  builder: (_) => const GitHubSettingsPage(),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.public),
+              title: const Text('联网搜索配置'),
+              subtitle: const Text('设置 SearXNG、Brave 或 Tavily 搜索服务'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const WebSearchSettingsPage(),
+                ),
               ),
             ),
           ),
@@ -291,9 +363,9 @@ class _SectionLabel extends StatelessWidget {
       child: Text(
         text,
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              letterSpacing: 0.6,
-            ),
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          letterSpacing: 0.6,
+        ),
       ),
     );
   }
@@ -348,29 +420,31 @@ class _ThemePreview extends StatelessWidget {
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: Text('卡片标题示例', style: theme.textTheme.titleSmall),
+                        child: Text(
+                          '卡片标题示例',
+                          style: theme.textTheme.titleSmall,
+                        ),
                       ),
                       Chip(
-                        label: Text(
-                          'seed',
-                          style: theme.textTheme.labelSmall,
-                        ),
+                        label: Text('seed', style: theme.textTheme.labelSmall),
                         visualDensity: VisualDensity.compact,
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    theme.brightness == Brightness.dark ? '当前为深色模式' : '当前为浅色模式 · ${AppColors.toHex(theme.colorScheme.surface)}',
-                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface, height: 1.5),
+                    theme.brightness == Brightness.dark
+                        ? '当前为深色模式'
+                        : '当前为浅色模式 · ${AppColors.toHex(theme.colorScheme.surface)}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface,
+                      height: 1.5,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Row(
                     children: <Widget>[
-                      FilledButton(
-                        onPressed: () {},
-                        child: const Text('主按钮'),
-                      ),
+                      FilledButton(onPressed: () {}, child: const Text('主按钮')),
                       const SizedBox(width: 8),
                       OutlinedButton(
                         onPressed: () {},
@@ -414,23 +488,27 @@ class _SwatchButton extends StatelessWidget {
               color: preset.color,
               shape: BoxShape.circle,
               border: Border.all(
-                color: selected ? AppColors.textPrimary : const Color(0xFFE6E0D4),
+                color: selected
+                    ? AppColors.textPrimary
+                    : const Color(0xFFE6E0D4),
                 width: selected ? 2 : 1,
               ),
             ),
             child: selected
-                ? const Icon(Icons.check, size: 20, color: AppColors.textPrimary)
+                ? const Icon(
+                    Icons.check,
+                    size: 20,
+                    color: AppColors.textPrimary,
+                  )
                 : null,
           ),
           const SizedBox(height: 4),
           Text(
             preset.name,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: selected
-                      ? AppColors.textPrimary
-                      : AppColors.textSecondary,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                ),
+              color: selected ? AppColors.textPrimary : AppColors.textSecondary,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+            ),
           ),
         ],
       ),
