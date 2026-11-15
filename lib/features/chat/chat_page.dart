@@ -338,7 +338,7 @@ class ChatPageState extends ConsumerState<ChatPage> {
             'required': ['query'],
           }),
           onCall: (Map<String, dynamic> args) async {
-            final WebSearchConfig config = WebSearchConfig.load(
+            final WebSearchConfig config = await WebSearchConfig.load(
               ref.read(sharedPreferencesProvider),
             );
             if (config.provider != WebSearchProvider.searxng &&

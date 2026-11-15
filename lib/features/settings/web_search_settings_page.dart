@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../services/search/web_search_service.dart';
+
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
 import '../../providers/app_providers.dart';
 
 class WebSearchSettingsPage extends ConsumerStatefulWidget {
@@ -18,10 +21,22 @@ class _WebSearchSettingsPageState extends ConsumerState<WebSearchSettingsPage> {
   @override
   void initState() {
     super.initState();
-    final config = WebSearchConfig.load(ref.read(sharedPreferencesProvider));
-    _provider = config.provider;
-    _url = TextEditingController(text: config.baseUrl);
-    _key = TextEditingController(text: config.apiKey);
+    _provider = WebSearchProvider.searxng;
+    _url = TextEditingController();
+    _key = TextEditingController();
+    Future<void>.microtask(_load);
+  }
+
+  Future<void> _load() async {
+    final WebSearchConfig config = await WebSearchConfig.load(
+      ref.read(sharedPreferencesProvider),
+    );
+    if (!mounted) return;
+    setState(() {
+      _provider = config.provider;
+      _url.text = config.baseUrl;
+      _key.text = config.apiKey;
+    });
   }
 
   @override
@@ -35,7 +50,11 @@ class _WebSearchSettingsPageState extends ConsumerState<WebSearchSettingsPage> {
     final prefs = ref.read(sharedPreferencesProvider);
     await prefs.setString(WebSearchConfig.providerKey, _provider.name);
     await prefs.setString(WebSearchConfig.urlKey, _url.text.trim());
-    await prefs.setString(WebSearchConfig.keyKey, _key.text.trim());
+    final FlutterSecureStorage secureStorage = const FlutterSecureStorage();
+    await secureStorage.write(
+      key: WebSearchConfig.secureKeyRef,
+      value: _key.text.trim(),
+    );
     if (mounted) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('联网搜索设置已保存')));

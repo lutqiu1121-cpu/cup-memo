@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -11,20 +12,30 @@ class WebSearchConfig {
     required this.baseUrl,
     required this.apiKey,
   });
+
   final WebSearchProvider provider;
   final String baseUrl;
   final String apiKey;
-  static const providerKey = 'cup_memo.search.provider';
-  static const urlKey = 'cup_memo.search.url';
-  static const keyKey = 'cup_memo.search.key';
-  static WebSearchConfig load(SharedPreferences prefs) => WebSearchConfig(
-    provider: WebSearchProvider.values.firstWhere(
-      (p) => p.name == prefs.getString(providerKey),
-      orElse: () => WebSearchProvider.searxng,
-    ),
-    baseUrl: prefs.getString(urlKey) ?? '',
-    apiKey: prefs.getString(keyKey) ?? '',
-  );
+
+  static const String providerKey = 'cup_memo.search.provider';
+  static const String urlKey = 'cup_memo.search.url';
+  static const String secureKeyRef = 'cup_memo.search.api_key';
+
+  static Future<WebSearchConfig> load(
+    SharedPreferences prefs, {
+    FlutterSecureStorage? storage,
+  }) async {
+    final FlutterSecureStorage secureStorage =
+        storage ?? const FlutterSecureStorage();
+    return WebSearchConfig(
+      provider: WebSearchProvider.values.firstWhere(
+        (WebSearchProvider p) => p.name == prefs.getString(providerKey),
+        orElse: () => WebSearchProvider.searxng,
+      ),
+      baseUrl: prefs.getString(urlKey) ?? '',
+      apiKey: await secureStorage.read(key: secureKeyRef) ?? '',
+    );
+  }
 }
 
 class WebSearchService {
@@ -32,20 +43,19 @@ class WebSearchService {
     : _client = client ?? http.Client();
   final WebSearchConfig config;
   final http.Client _client;
+
   Future<List<Map<String, String>>> search(String query) async {
     final Uri uri;
     final Map<String, String> headers = <String, String>{};
     final Map<String, dynamic> body = <String, dynamic>{};
     switch (config.provider) {
       case WebSearchProvider.searxng:
-        uri =
-            Uri.parse(
-              config.baseUrl.isEmpty
-                  ? 'http://localhost:8080/search'
-                  : config.baseUrl,
-            ).replace(
-              queryParameters: <String, String>{'q': query, 'format': 'json'},
-            );
+        if (config.baseUrl.trim().isEmpty) {
+          throw StateError('请先填写 SearXNG 接口地址');
+        }
+        uri = Uri.parse(config.baseUrl).replace(
+          queryParameters: <String, String>{'q': query, 'format': 'json'},
+        );
         break;
       case WebSearchProvider.brave:
         uri = Uri.parse(
