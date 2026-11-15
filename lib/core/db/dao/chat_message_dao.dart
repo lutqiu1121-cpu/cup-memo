@@ -24,11 +24,13 @@ class ChatMessageDao {
     final String model = columns.contains('model') ? 'model' : 'NULL AS model';
     final String active = columns.contains('active') ? 'AND active = 1' : '';
     final rows = _db.select(
-      'SELECT id, session_id, $parent, $children, role, content, created_at, $provider, $model FROM chat_messages WHERE session_id = ? $active ORDER BY created_at ASC LIMIT ? OFFSET ?',
+      'SELECT id, session_id, $parent, $children, role, content, created_at, $provider, $model FROM chat_messages WHERE session_id = ? $active ORDER BY created_at DESC LIMIT ? OFFSET ?',
       [sessionId, limit, offset],
     );
     return rows
         .map((row) => ChatMessage.fromRow(Map<String, Object?>.from(row)))
+        .toList(growable: false)
+        .reversed
         .toList(growable: false);
   }
 
@@ -49,9 +51,39 @@ class ChatMessageDao {
     );
   }
 
-  void deleteAfter(String sessionId, String id) {
+  void addChild(String parentId, String childId) {
+    final ResultSet rows = _db.select(
+      'SELECT children_ids FROM chat_messages WHERE id = ?',
+      [parentId],
+    );
+    if (rows.isEmpty) return;
+    final Object? raw = rows.first['children_ids'];
+    List<String> children;
+    try {
+      final dynamic decoded = jsonDecode(raw?.toString() ?? '[]');
+      children = decoded is List
+          ? decoded.map((Object? value) => value.toString()).toList()
+          : <String>[];
+    } catch (_) {
+      children = <String>[];
+    }
+    if (!children.contains(childId)) children.add(childId);
+    _db.execute('UPDATE chat_messages SET children_ids = ? WHERE id = ?', [
+      jsonEncode(children),
+      parentId,
+    ]);
+  }
+
+  void deleteAfter(String sessionId, String id) =>
+      deactivateFrom(sessionId, id);
+
+  void deactivateMessage(String id) {
+    _db.execute('UPDATE chat_messages SET active = 0 WHERE id = ?', [id]);
+  }
+
+  void deactivateFrom(String sessionId, String id) {
     _db.execute(
-      'UPDATE chat_messages SET active = 0 WHERE session_id = ? AND created_at > (SELECT created_at FROM chat_messages WHERE id = ?)',
+      'UPDATE chat_messages SET active = 0 WHERE session_id = ? AND created_at >= (SELECT created_at FROM chat_messages WHERE id = ?)',
       [sessionId, id],
     );
   }

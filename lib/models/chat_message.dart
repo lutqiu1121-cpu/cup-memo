@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:meta/meta.dart';
 
 /// Who produced a [ChatMessage].
@@ -77,14 +79,26 @@ class ChatMessage {
       providerId: row['provider_id'] as String?,
       model: row['model'] as String?,
       parentId: row['parent_id'] as String?,
-      childrenIds: (row['children_ids'] as String? ?? '')
-          .replaceAll('[', '')
-          .replaceAll(']', '')
-          .replaceAll('"', '')
-          .split(',')
-          .where((String id) => id.isNotEmpty)
-          .toList(growable: false),
+      childrenIds: _decodeChildren(row['children_ids'] as String?),
     );
+  }
+
+  static List<String> _decodeChildren(String? raw) {
+    if (raw == null || raw.isEmpty) return const <String>[];
+    try {
+      final Object? decoded = jsonDecode(raw);
+      if (decoded is List) {
+        return decoded
+            .map((Object? value) => value.toString())
+            .toList(growable: false);
+      }
+    } catch (_) {
+      return raw
+          .split(',')
+          .where((String value) => value.isNotEmpty)
+          .toList(growable: false);
+    }
+    return const <String>[];
   }
 
   /// Message shape accepted by the provider APIs.

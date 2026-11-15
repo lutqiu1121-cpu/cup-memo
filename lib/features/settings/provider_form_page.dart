@@ -526,7 +526,7 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
                 controller: TextEditingController(
                   text: _contextOverride.toString(),
                 ),
-                decoration: const InputDecoration(labelText: '最大上下文 tokens'),
+                decoration: const InputDecoration(labelText: '最大上下文长度'),
                 onSubmitted: (String value) {
                   final parsed = int.tryParse(value);
                   if (parsed != null) {
@@ -536,7 +536,7 @@ class _ProviderFormPageState extends ConsumerState<ProviderFormPage> {
                   }
                 },
               ),
-            Text('模型上下文档案：${_capabilities.maxContextTokens ?? 8192} tokens'),
+            Text('服务商返回的上下文上限：${_capabilities.maxContextTokens ?? '未提供'}'),
             Slider(
               value:
                   (_manualContext

@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/id.dart';
 import '../../core/widgets/empty_state.dart';
+import '../../core/db/dao/session_dao.dart';
 import '../../models/chat_message.dart';
 import '../../models/entry.dart';
 import '../../providers/app_providers.dart';
@@ -105,6 +106,7 @@ class ChatPageState extends ConsumerState<ChatPage> {
     final double oldExtent = _scroll.hasClients
         ? _scroll.position.maxScrollExtent
         : 0;
+    final double oldPixels = _scroll.hasClients ? _scroll.position.pixels : 0;
     final List<ChatMessage> older = db.chatMessageDao.list(
       _sessionId!,
       limit: 50,
@@ -118,7 +120,9 @@ class ChatPageState extends ConsumerState<ChatPage> {
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
-        _scroll.jumpTo(_scroll.position.maxScrollExtent - oldExtent);
+        _scroll.jumpTo(
+          oldPixels + (_scroll.position.maxScrollExtent - oldExtent),
+        );
       }
     });
   }
@@ -128,12 +132,28 @@ class ChatPageState extends ConsumerState<ChatPage> {
   Future<void> _newSession() async {
     final db = ref.read(databaseProvider);
     if (db != null && _sessionId != null) db.sessionDao.end(_sessionId!);
+    final String newId = db?.sessionDao.create() ?? newSessionId();
     setState(() {
-      _sessionId = db?.sessionDao.create() ?? newSessionId();
+      _sessionId = newId;
       _messages.clear();
       _reasoning.clear();
       _historyOffset = 0;
       _hasOlder = false;
+    });
+  }
+
+  Future<void> _openSession(String sessionId) async {
+    final db = ref.read(databaseProvider);
+    if (db == null) return;
+    final List<ChatMessage> page = db.chatMessageDao.list(sessionId, limit: 50);
+    setState(() {
+      _sessionId = sessionId;
+      _messages
+        ..clear()
+        ..addAll(page);
+      _historyOffset = page.length;
+      _hasOlder = page.length == 50;
+      _reasoning.clear();
     });
   }
 
@@ -370,9 +390,133 @@ class ChatPageState extends ConsumerState<ChatPage> {
     return '请求失败，请检查服务商设置后重试';
   }
 
-  Future<void> _send() async {
+  void _saveBranchChild(ChatMessage parent, ChatMessage child) {
+    final int index = _messages.indexWhere(
+      (ChatMessage item) => item.id == parent.id,
+    );
+    if (index < 0) return;
+    final ChatMessage linked = ChatMessage(
+      id: parent.id,
+      sessionId: parent.sessionId,
+      role: parent.role,
+      content: parent.content,
+      createdAt: parent.createdAt,
+      providerId: parent.providerId,
+      model: parent.model,
+      parentId: parent.parentId,
+      childrenIds: <String>[...parent.childrenIds, child.id],
+    );
+    _messages[index] = linked;
+    ref.read(databaseProvider)?.chatMessageDao.upsert(linked);
+  }
+
+  Future<void> _editUserMessage(ChatMessage message) async {
+    final TextEditingController edit = TextEditingController(
+      text: message.content,
+    );
+    final String? value = await showDialog<String>(
+      context: context,
+      builder: (BuildContext dialog) => AlertDialog(
+        title: const Text('编辑消息'),
+        content: TextField(controller: edit, minLines: 1, maxLines: 6),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(dialog),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialog, edit.text.trim()),
+            child: const Text('重新发送'),
+          ),
+        ],
+      ),
+    );
+    edit.dispose();
+    if (value == null || value.isEmpty || !mounted) return;
+    final db = ref.read(databaseProvider);
+    final String branchId = newMessageId();
+    final ChatMessage branch = ChatMessage(
+      id: branchId,
+      sessionId: message.sessionId,
+      role: ChatRole.user,
+      content: value,
+      createdAt: DateTime.now(),
+      providerId: message.providerId,
+      model: message.model,
+      parentId: message.parentId,
+    );
+    db?.chatMessageDao.deactivateFrom(message.sessionId, message.id);
+    if (message.parentId != null) {
+      final ChatMessage? parent = _messages
+          .where((ChatMessage item) => item.id == message.parentId)
+          .firstOrNull;
+      if (parent != null) {
+        _saveBranchChild(parent, branch);
+      } else {
+        db?.chatMessageDao.addChild(message.parentId!, branch.id);
+      }
+    }
+    db?.chatMessageDao.upsert(branch);
+    final int index = _messages.indexWhere(
+      (ChatMessage item) => item.id == message.id,
+    );
+    setState(() {
+      if (index >= 0) _messages.removeRange(index, _messages.length);
+      _messages.add(branch);
+      _input.text = value;
+    });
+    await _send(overrideText: value, addUser: false, parentId: branchId);
+  }
+
+  Future<void> _regenerate(ChatMessage message) async {
+    final int index = _messages.indexWhere(
+      (ChatMessage item) => item.id == message.id,
+    );
+    if (index < 1) return;
+    final ChatMessage parent = _messages[index - 1];
+    final String prompt = parent.content;
+    final db = ref.read(databaseProvider);
+    final String siblingId = newMessageId();
+    final ChatMessage sibling = ChatMessage(
+      id: siblingId,
+      sessionId: message.sessionId,
+      role: ChatRole.assistant,
+      content: '',
+      createdAt: DateTime.now(),
+      providerId: message.providerId,
+      model: message.model,
+      parentId: parent.id,
+    );
+    final int parentIndex = _messages.indexWhere(
+      (ChatMessage item) => item.id == parent.id,
+    );
+    if (parentIndex >= 0) {
+      _saveBranchChild(_messages[parentIndex], sibling);
+    } else {
+      db?.chatMessageDao.addChild(parent.id, sibling.id);
+    }
+    db?.chatMessageDao.deactivateMessage(message.id);
+    db?.chatMessageDao.deleteAfter(message.sessionId, message.id);
+    setState(() {
+      _messages.removeRange(index, _messages.length);
+      _input.text = prompt;
+    });
+    await _send(
+      overrideText: prompt,
+      addUser: false,
+      parentId: parent.id,
+      assistantId: siblingId,
+    );
+  }
+
+  Future<void> _send({
+    String? overrideText,
+    bool addUser = true,
+    String? parentId,
+    String? assistantId,
+  }) async {
     final int turnId = ++_activeTurnId;
-    final String text = _input.text.trim();
+    final String text = overrideText ?? _input.text.trim();
     if (text.isEmpty || _sending) {
       return;
     }
@@ -386,33 +530,58 @@ class ChatPageState extends ConsumerState<ChatPage> {
     }
 
     _input.clear();
-    final ChatMessage user = ChatMessage(
-      id: newMessageId(),
-      sessionId: _sessionId ?? 'current',
-      role: ChatRole.user,
-      content: text,
-      createdAt: DateTime.now(),
-      providerId: router.config.id,
-      model: _modelFor(router.config),
-    );
-    final List<ChatMessage> request = <ChatMessage>[..._messages, user];
-    final String assistantId = newMessageId();
+    final String? userParentId =
+        parentId ?? (_messages.isEmpty ? null : _messages.last.id);
+    final ChatMessage? user = addUser
+        ? ChatMessage(
+            id: newMessageId(),
+            sessionId: _sessionId ?? 'current',
+            role: ChatRole.user,
+            content: text,
+            createdAt: DateTime.now(),
+            providerId: router.config.id,
+            model: _modelFor(router.config),
+            parentId: userParentId,
+          )
+        : null;
+    final List<ChatMessage> request = <ChatMessage>[..._messages, ?user];
+    final String activeAssistantId = assistantId ?? newMessageId();
+    final String? assistantParentId =
+        user?.id ??
+        parentId ??
+        (_messages.isNotEmpty ? _messages.last.id : null);
     setState(() {
-      _messages.add(user);
-      ref.read(databaseProvider)?.chatMessageDao.upsert(user);
+      if (user != null) {
+        if (user.parentId != null) {
+          final ChatMessage? parent = _messages
+              .where((ChatMessage item) => item.id == user.parentId)
+              .firstOrNull;
+          if (parent != null) {
+            _saveBranchChild(parent, user);
+          } else {
+            ref
+                .read(databaseProvider)
+                ?.chatMessageDao
+                .addChild(user.parentId!, user.id);
+          }
+        }
+        _messages.add(user);
+        ref.read(databaseProvider)?.chatMessageDao.upsert(user);
+      }
       ref
           .read(databaseProvider)
           ?.sessionDao
           .incrementMessageCount(_sessionId ?? 'current');
       _messages.add(
         ChatMessage(
-          id: assistantId,
+          id: activeAssistantId,
           sessionId: _sessionId ?? 'current',
           role: ChatRole.assistant,
           content: '',
           createdAt: DateTime.now(),
           providerId: router.config.id,
           model: _modelFor(router.config),
+          parentId: assistantParentId,
         ),
       );
       _sending = true;
@@ -420,14 +589,14 @@ class ChatPageState extends ConsumerState<ChatPage> {
     _scrollToBottom();
 
     final StreamingBubbleNotifier live = StreamingBubbleNotifier();
-    _streaming[assistantId] = live;
+    _streaming[activeAssistantId] = live;
     final StringBuffer buffer = StringBuffer();
     Timer? flushTimer;
     void flush() {
       flushTimer?.cancel();
       flushTimer = null;
       final int index = _messages.indexWhere(
-        (ChatMessage m) => m.id == assistantId,
+        (ChatMessage m) => m.id == activeAssistantId,
       );
       if (!mounted || index < 0) return;
       final ChatMessage old = _messages[index];
@@ -471,8 +640,8 @@ class ChatPageState extends ConsumerState<ChatPage> {
         buffer.write(chunk.text);
         live.append(chunk.text);
         if (chunk.reasoning.isNotEmpty) {
-          _reasoning[assistantId] =
-              '${_reasoning[assistantId] ?? ''}${chunk.reasoning}';
+          _reasoning[activeAssistantId] =
+              '${_reasoning[activeAssistantId] ?? ''}${chunk.reasoning}';
         }
         scheduleFlush();
       }
@@ -482,7 +651,7 @@ class ChatPageState extends ConsumerState<ChatPage> {
     } catch (error) {
       flushTimer?.cancel();
       final int index = _messages.indexWhere(
-        (ChatMessage m) => m.id == assistantId,
+        (ChatMessage m) => m.id == activeAssistantId,
       );
       if (mounted && index >= 0) {
         final old = _messages[index];
@@ -502,7 +671,7 @@ class ChatPageState extends ConsumerState<ChatPage> {
         });
       }
     } finally {
-      _streaming.remove(assistantId);
+      _streaming.remove(activeAssistantId);
       live.dispose();
       if (mounted) setState(() => _sending = false);
     }
@@ -545,6 +714,41 @@ class ChatPageState extends ConsumerState<ChatPage> {
     });
   }
 
+  Future<void> _showHistory() async {
+    final db = ref.read(databaseProvider);
+    if (db == null) return;
+    final List<ChatSessionRecord> sessions = db.sessionDao.list();
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext sheet) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.sizeOf(sheet).height * 0.65,
+          child: ListView(
+            children: <Widget>[
+              const ListTile(title: Text('历史会话')),
+              for (final ChatSessionRecord session in sessions)
+                ListTile(
+                  title: Text(
+                    '会话 ${session.id.substring(0, session.id.length < 8 ? session.id.length : 8)}',
+                  ),
+                  subtitle: Text(
+                    '${session.startedAt} · ${session.messageCount} 条消息',
+                  ),
+                  onTap: () {
+                    Navigator.pop(sheet);
+                    _openSession(session.id);
+                  },
+                ),
+              if (sessions.isEmpty) const ListTile(title: Text('暂无历史会话')),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _pickProvider() async {
     final ProviderListState list = ref.read(providerListProvider);
     if (list.isEmpty) {
@@ -572,6 +776,17 @@ class ChatPageState extends ConsumerState<ChatPage> {
                 onTap: () => Navigator.of(sheetContext).pop(item.id),
               ),
             const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => Navigator.of(sheetContext).pop('__add__'),
+                  icon: const Icon(Icons.add),
+                  label: const Text('添加新服务商'),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -613,6 +828,11 @@ class ChatPageState extends ConsumerState<ChatPage> {
             onPressed: () => appShellScaffoldKey.currentState?.openDrawer(),
           ),
           actions: <Widget>[
+            IconButton(
+              tooltip: '历史会话',
+              icon: const Icon(Icons.history),
+              onPressed: _showHistory,
+            ),
             IconButton(
               tooltip: '新建对话',
               icon: const Icon(Icons.add_comment_outlined),
@@ -658,6 +878,10 @@ class ChatPageState extends ConsumerState<ChatPage> {
                             _Bubble(
                               message: _messages[index],
                               reasoning: _reasoning[_messages[index].id],
+                              onLongPress: () =>
+                                  _messages[index].role == ChatRole.user
+                                  ? _editUserMessage(_messages[index])
+                                  : _regenerate(_messages[index]),
                             ),
                       ),
                     ),
@@ -784,10 +1008,11 @@ class ChatPageState extends ConsumerState<ChatPage> {
 }
 
 class _Bubble extends StatelessWidget {
-  const _Bubble({required this.message, this.reasoning});
+  const _Bubble({required this.message, this.reasoning, this.onLongPress});
 
   final ChatMessage message;
   final String? reasoning;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -795,49 +1020,54 @@ class _Bubble extends StatelessWidget {
     final bool user = message.role == ChatRole.user;
     return Align(
       alignment: user ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 340),
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-        decoration: BoxDecoration(
-          color: user
-              ? theme.colorScheme.primary.withValues(alpha: 0.22)
-              : Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            if (reasoning != null && reasoning!.isNotEmpty)
-              ExpansionTile(
-                tilePadding: EdgeInsets.zero,
-                childrenPadding: EdgeInsets.zero,
-                title: const Text('思考过程', style: TextStyle(fontSize: 12)),
-                children: <Widget>[
-                  Text(
-                    reasoning!,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
+      child: GestureDetector(
+        onLongPress: onLongPress,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 340),
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          decoration: BoxDecoration(
+            color: user
+                ? theme.colorScheme.primary.withValues(alpha: 0.22)
+                : Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              if (reasoning != null && reasoning!.isNotEmpty)
+                ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: EdgeInsets.zero,
+                  title: const Text('思考过程', style: TextStyle(fontSize: 12)),
+                  children: <Widget>[
+                    Text(
+                      reasoning!,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
+                  ],
+                ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      message.content.isEmpty ? '…' : message.content,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: '复制',
+                    icon: const Icon(Icons.copy_outlined, size: 16),
+                    onPressed: () =>
+                        Clipboard.setData(ClipboardData(text: message.content)),
                   ),
                 ],
               ),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: <Widget>[
-                Expanded(
-                  child: Text(message.content.isEmpty ? '…' : message.content),
-                ),
-                IconButton(
-                  tooltip: '复制',
-                  icon: const Icon(Icons.copy_outlined, size: 16),
-                  onPressed: () =>
-                      Clipboard.setData(ClipboardData(text: message.content)),
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -7,7 +7,7 @@ import '../../providers/app_providers.dart';
 import '../../services/provider/provider_config.dart';
 import 'provider_form_page.dart';
 
-/// 服务商 list: add / edit / set default / delete.
+/// 服务商管理：添加、编辑、设为默认或删除。
 class ProviderManagementPage extends ConsumerWidget {
   const ProviderManagementPage({super.key});
 
@@ -30,10 +30,8 @@ class ProviderManagementPage extends ConsumerWidget {
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext dialogContext) => AlertDialog(
-        title: const Text('删除 服务商'),
-        content: Text(
-          '确定删除「${config.name}」吗？其保存在安全存储中的 访问密钥 (API Key) 也会一并删除。',
-        ),
+        title: const Text('删除服务商'),
+        content: Text('确定删除「${config.name}」吗？其保存在安全存储中的 访问密钥也会一并删除。'),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -92,11 +90,11 @@ class ProviderManagementPage extends ConsumerWidget {
               children: <Widget>[
                 EmptyState(
                   icon: Icons.hub_outlined,
-                  title: '还没有 服务商',
+                  title: '还没有服务商',
                   description:
                       '支持 OpenAI 兼容、DeepSeek 官方、Anthropic、Gemini 与本地 Ollama。\n'
                       '添加后可设为默认，并在会话页随时切换。',
-                  actionLabel: '添加第一条 服务商',
+                  actionLabel: '添加第一家服务商',
                   onAction: () => _openForm(context),
                 ),
               ],
@@ -121,7 +119,7 @@ class ProviderManagementPage extends ConsumerWidget {
                   ScaffoldMessenger.of(context)
                     ..hideCurrentSnackBar()
                     ..showSnackBar(
-                      SnackBar(content: Text('已将 ${config.name} 设为默认 服务商')),
+                      SnackBar(content: Text('已将 ${config.name} 设为默认服务商')),
                     );
                 },
                 onDelete: () => _confirmDelete(context, ref, config),
@@ -206,9 +204,7 @@ class _ProviderTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    config.baseUrl.isEmpty
-                        ? '（未填写 接口地址 (Base URL)）'
-                        : config.baseUrl,
+                    config.baseUrl.isEmpty ? '（未填写接口地址）' : config.baseUrl,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: AppColors.textSecondary,
                     ),
